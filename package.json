@@ -1,0 +1,15 @@
+{
+  "name": "mitempsrv",
+  "version": "1.0.0",
+  "main": "mitempsrv.js",
+  "author": "christophe.saillard",
+  "license": "MIT",
+  "dependencies": {
+    "async-redis": "^1.1.7",
+    "chart.js": "^2.9.3",
+    "express": "^4.17.1",
+    "express-session": "^1.17.1",
+    "redis": "^3.0.2",
+    "serve-favicon": "^2.5.0"
+  }
+}
