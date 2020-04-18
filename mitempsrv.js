@@ -49,16 +49,22 @@ const gettemphum = async (field) => {
   return {temp, hum}
 }
 
+const formatDateTime = (str) => {
+  const time = str.split('-');
+  const date = time[0].split('/');
+  return date[1]+'/'+date[0]+'/'+date[2]+' '+time[1]+'h'
+}
+
 const loadDataFromRedis = async (req, res) => {
   const tempDevices = await smembers("devices")
   const tempDateTime = await smembers("datetime")
 
   const tempDateTimeSorted = tempDateTime.sort( (a, b) => {
-    const adate = a.split('/');
     const atime = a.split('-');
+    const adate = atime[0].split('/');
     const aa = adate[2]+adate[0]+adate[1]+atime[1]
-    const bdate = b.split('/');
     const btime = b.split('-');
+    const bdate = btime[0].split('/');
     const bb = bdate[2]+bdate[0]+bdate[1]+btime[1]
     return aa.localeCompare(bb);;
   });
@@ -84,7 +90,7 @@ const loadDataFromRedis = async (req, res) => {
     })
   })).then((alldata) => {
     const message = {
-      labels: tempDateTime,
+      labels: tempDateTime.map(x=>formatDateTime(x)),
       datasets: alldata.reduce(x=>x),
       borderWidth: 1
     }    
