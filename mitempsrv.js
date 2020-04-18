@@ -30,7 +30,7 @@ function sendJsonString(jsonString, req, res) {
   res.type('application/json')
   res.status('200')
   if (IsJsonString(jsonString)) {
-    console.log('JSON: ' + jsonString)
+    // console.log('JSON: ' + jsonString)
     res.send(jsonString)
   } else {
     console.log('JSON malformed: ' + jsonString)
@@ -52,8 +52,19 @@ const gettemphum = async (field) => {
 const loadDataFromRedis = async (req, res) => {
   const tempDevices = await smembers("devices")
   const tempDateTime = await smembers("datetime")
+
+  const tempDateTimeSorted = tempDateTime.sort( (a, b) => {
+    const adate = a.split('/');
+    const atime = a.split('-');
+    const aa = adate[2]+adate[0]+adate[1]+atime[1]
+    const bdate = b.split('/');
+    const btime = b.split('-');
+    const bb = bdate[2]+bdate[0]+bdate[1]+btime[1]
+    return aa.localeCompare(bb);;
+  });
+
   Promise.all(tempDevices.map((dv) => { 
-    return Promise.all(tempDateTime.map((dt) => { 
+    return Promise.all(tempDateTimeSorted.map((dt) => { 
       return gettemphum(dt+'-'+dv).then((val) => { 
         return val
       });
