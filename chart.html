@@ -8,12 +8,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="christophe.saillard@protonmail.com" content="">
     <link rel="stylesheet" href="css/style.css">
-    <script src="http://code.jquery.com/jquery-latest.min.js"></script>
     <script src="./dist/Chart.js"></script>
 </head>
-
 <body>
-    <canvas id="myChart"></canvas>
+    <div>
+        <label for="period-select">Pédiode des mesures: </label>
+        <select name="periods" id="period-select" onchange="selectPeriod(this)">
+            <option value="6">6h</option>
+            <option value="24">24h</option>
+            <option value="168">Semaine</option>
+            <option value="672">Mois</option>
+            <option value="8064">Année</option>
+        </select>
+        <div class="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
 </body>
 <script src="./chart.js"></script>
 </html>

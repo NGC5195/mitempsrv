@@ -55,11 +55,11 @@ const formatDateTime = (str) => {
   return date[1]+'/'+date[0]+'/'+date[2]+' '+time[1]+'h'
 }
 
-const loadDataFromRedis = async (req, res) => {
+const loadDataFromRedis = async (depth, callback) => {
   const tempDevices = await smembers("devices")
   const tempDateTime = await smembers("datetime")
 
-  const tempDateTimeSorted = tempDateTime.sort( (a, b) => {
+  var tempDateTimeSorted = tempDateTime.sort( (a, b) => {
     const atime = a.split('-');
     const adate = atime[0].split('/');
     const aa = adate[2]+adate[0]+adate[1]+atime[1]
@@ -69,32 +69,38 @@ const loadDataFromRedis = async (req, res) => {
     return aa.localeCompare(bb);;
   });
 
+  if (tempDateTimeSorted.length > depth) {
+    tempDateTimeSorted = tempDateTimeSorted.slice(Math.max(tempDateTimeSorted.length - depth, 0))
+  }  
+
   Promise.all(tempDevices.map((dv) => { 
     return Promise.all(tempDateTimeSorted.map((dt) => { 
       return gettemphum(dt+'-'+dv).then((val) => { 
         return val
       });
-    })).then((temperatures) => {
+    })).then((data) => {
         return [{
           label: 'Temp: '+dv,
           fill: false,
           borderColor: 'green',
-          data: temperatures.map(o=>o.temp)
+          data: data.map(o=>o.temp),
+          yAxisID: 'left-y-axis'
         },
         {
           label: 'Hum: '+dv,
           fill: false,
           borderColor: 'blue',
-          data: temperatures.map(o=>o.hum)
+          data: data.map(o=>o.hum),
+          yAxisID: 'right-y-axis'
         }]
     })
   })).then((alldata) => {
     const message = {
-      labels: tempDateTime.map(x=>formatDateTime(x)),
+      labels: tempDateTimeSorted.map(x=>formatDateTime(x)),
       datasets: alldata.reduce(x=>x),
       borderWidth: 1
     }    
-    sendJsonString(JSON.stringify(message), req, res)
+    callback(message)
   })
 }
 
@@ -116,11 +122,13 @@ app.use(session)
 app.use(favicon(__dirname + '/icon.png'))
 
 // service to load next level of the WATS tree on AJAX request
-app.get('/data', function (req, res) {
-  loadDataFromRedis(req, res)
+app.get('/data',  (req, res) => {
+  loadDataFromRedis(parseInt(req.query.depth), (message)=> {
+    sendJsonString(JSON.stringify(message), req, res)
+  })
 })
 
-app.use(function (req, res) {
+app.use( (req, res) => {
   res.type('text/plain')
   res.status('404')
   res.send('404 - Not Found')
