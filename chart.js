@@ -22,6 +22,8 @@ const myChart = new Chart(ctx, {
     options: {
         animation: false,
         responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.5,
         scales: {
             yAxes: [{
                 id: 'left-y-axis',

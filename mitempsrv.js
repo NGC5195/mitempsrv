@@ -84,14 +84,14 @@ const loadDataFromRedis = async (depth, callback) => {
           fill: false,
           borderColor: 'green',
           data: data.map(o=>o.temp),
-          yAxisID: 'left-y-axis'
+          yAxisID: 'right-y-axis'
         },
         {
           label: 'Hum: '+dv,
           fill: false,
           borderColor: 'blue',
           data: data.map(o=>o.hum),
-          yAxisID: 'right-y-axis'
+          yAxisID: 'left-y-axis'
         }]
     })
   })).then((alldata) => {
