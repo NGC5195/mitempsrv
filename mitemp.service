@@ -1,0 +1,10 @@
+[Unit]
+Description=mitemp server
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/usr/bin/node /home/pi/mitempsrv/mitempsrv.js > /home/pi/log/mitemp.log 2>&1
+
+[Install]
+WantedBy=multi-user.target
