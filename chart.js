@@ -78,5 +78,6 @@ var depth = localStorage.getItem('depth')
 if (depth == "undefined") {
     depth = 24
 }
+document.getElementById('period-select').value = depth;
 loadData(depth)
 
