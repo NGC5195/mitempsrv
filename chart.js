@@ -76,7 +76,7 @@ const loadData = (depth) => {
 
 var depth = storage.getItem('depth')
 if (depth == "undefined") {
-    depth = 12
+    depth = 24
 }
 loadData(depth)
 
