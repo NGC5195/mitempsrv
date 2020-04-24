@@ -1,13 +1,12 @@
-const v8 = require('v8');
-const asyncRedis = require('async-redis');
-const redisClient = asyncRedis.createClient();
+const v8 = require('v8')
+const asyncRedis = require('async-redis')
+const redisClient = asyncRedis.createClient()
 "use strict"
 
-function showMemoryUsage() {
-  console.log(' >used heap size:' + (v8.getHeapStatistics().used_heap_size / 1024 / 1024).toFixed(2) + ' Mo - heap size limit: ' + (v8.getHeapStatistics().heap_size_limit / 1024 / 1024).toFixed(2) + ' Mo ' + (v8.getHeapStatistics().used_heap_size / v8.getHeapStatistics().heap_size_limit * 100).toFixed(2) + '%')
-}
+const showMemoryUsage = () => console.log(' >used heap size:' + (v8.getHeapStatistics().used_heap_size / 1024 / 1024).toFixed(2) + ' Mo - heap size limit: ' + (v8.getHeapStatistics().heap_size_limit / 1024 / 1024).toFixed(2) + ' Mo ' + (v8.getHeapStatistics().used_heap_size / v8.getHeapStatistics().heap_size_limit * 100).toFixed(2) + '%')
 
-String.prototype.toCamelCase = function () {
+
+String.prototype.toCamelCase = () => {
   if (this.length == 2) {
     return this
   } else {
@@ -17,7 +16,7 @@ String.prototype.toCamelCase = function () {
   }
 }
 
-function IsJsonString(str) {
+const IsJsonString = (str) => {
   try {
     JSON.parse(str)
   } catch (e) {
@@ -26,7 +25,7 @@ function IsJsonString(str) {
   return true
 }
 
-function sendJsonString(jsonString, req, res) {
+const sendJsonString = (jsonString, req, res) => {
   res.type('application/json')
   res.status('200')
   if (IsJsonString(jsonString)) {

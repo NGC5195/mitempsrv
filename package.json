@@ -10,6 +10,7 @@
     "express": "^4.17.1",
     "express-session": "^1.17.1",
     "redis": "^3.0.2",
-    "serve-favicon": "^2.5.0"
+    "serve-favicon": "^2.5.0",
+    "xhr-request": "^1.1.0"
   }
 }

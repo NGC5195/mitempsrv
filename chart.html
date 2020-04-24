@@ -14,11 +14,10 @@
     <div id="header">
         <label for="period-select">Pédiode des mesures: </label>
         <select name="periods" id="period-select" onchange="selectPeriod(this)">
-            <option value="6">6h</option>
-            <option value="24">24h</option>
+            <option value="24">6h</option>
+            <option value="48">24h</option>
             <option value="168">Semaine</option>
             <option value="672">Mois</option>
-            <option value="8064">Année</option>
         </select>
         <canvas id="myChart"></canvas>
     </div>
