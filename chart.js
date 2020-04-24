@@ -13,7 +13,7 @@ const formatDateTime = (str) => {
   }
 const selectPeriod = (o) => {
     const value = o.options[o.selectedIndex].value;
-    storage.setItem('depth', value)
+    localStorage.setItem('depth', value)
     loadData(value) 
 }
   
@@ -74,7 +74,7 @@ const loadData = (depth) => {
     xhr.send(null)
 }
 
-var depth = storage.getItem('depth')
+var depth = localStorage.getItem('depth')
 if (depth == "undefined") {
     depth = 24
 }
