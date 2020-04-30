@@ -42,9 +42,9 @@ const smembers = async (key) => {
   return values
 }
 
-const gettemphum = async (field) => {
-  const temp = await redisClient.hget('temp', field)
-  const hum = await redisClient.hget('hum', field)
+const gettemphum = async (key) => {
+  const temp = await redisClient.hget(key, 'temp')
+  const hum = await redisClient.hget(key, 'num')
   return {temp, hum}
 }
 
@@ -96,7 +96,7 @@ const loadDataFromRedis = async (depth, callback) => {
   })).then((alldata) => {
     const message = {
       labels: tempDateTimeSorted.map(x=>formatDateTime(x)),
-      datasets: alldata.reduce(x=>x),
+      datasets: alldata.reduce((acc,curr)=>curr.concat(acc)),
       borderWidth: 1
     }    
     callback(message)
