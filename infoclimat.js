@@ -37,7 +37,7 @@ const getData = () => {
                         const temp = precise(obj.temperature['2m'] - 273.15)
                         const hum = precise(obj.humidite['2m'])
 
-                        console.log(`${datetime} : ${temp}`)
+                        // console.log(`${datetime} : ${temp}`)
                         asyncsadd("datetime", datetime).then()
                         asynchset(datetime+'-'+device, 'temp', temp).then()
                         asynchset(datetime+'-'+device, 'hum', hum).then()
