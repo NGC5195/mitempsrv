@@ -44,7 +44,7 @@ const smembers = async (key) => {
 
 const gettemphum = async (key) => {
   const temp = await redisClient.hget(key, 'temp')
-  const hum = await redisClient.hget(key, 'num')
+  const hum = await redisClient.hget(key, 'hum')
   return {temp, hum}
 }
 
