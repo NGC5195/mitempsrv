@@ -16,7 +16,9 @@ const getData = () => {
         return await redisClient.hset(key, field, value)
     }
     
-    request('http://www.infoclimat.fr/public-api/gfs/json?_ll=48.9891224,0.7801129&_auth=VU8DFFMtVXdTflZhUyVQeQVtATRZLwEmUy8GZQ1oUi9TOQBjAGtWNVQ6WyYEKws%2FUn8AZwg%2FAzoBYFUzXy0Df1U1A2dTM1U%2FUz9WNlNhUHsFKQF8WWcBJlMvBmkNZFIvUzIAZABkVipUOVs4BDcLIVJgAGgIPgMkAX1VM183A2hVMQNjUzBVNlM1VjxTZFB7BSkBZFkzATBTZAY1DWVSMVMzAGcAa1YzVDxbOQQ9CyFSYABpCDcDOQFlVTNfMQNhVSkDeFNJVURTIVZ0UyFQMQVwAXxZMwFnU2Q%3D&_c=7a9fd6c8622720cb15b71b1c00dcb792',
+    const suresne = '48.8687162,2.2044489'
+    const ajou = '48.9891224,0.7801129'
+    request(`http://www.infoclimat.fr/public-api/gfs/json?_ll=${suresne}&_auth=VU8DFFMtVXdTflZhUyVQeQVtATRZLwEmUy8GZQ1oUi9TOQBjAGtWNVQ6WyYEKws%2FUn8AZwg%2FAzoBYFUzXy0Df1U1A2dTM1U%2FUz9WNlNhUHsFKQF8WWcBJlMvBmkNZFIvUzIAZABkVipUOVs4BDcLIVJgAGgIPgMkAX1VM183A2hVMQNjUzBVNlM1VjxTZFB7BSkBZFkzATBTZAY1DWVSMVMzAGcAa1YzVDxbOQQ9CyFSYABpCDcDOQFlVTNfMQNhVSkDeFNJVURTIVZ0UyFQMQVwAXxZMwFnU2Q%3D&_c=7a9fd6c8622720cb15b71b1c00dcb792`,
         {
             json: true
         },
@@ -70,7 +72,7 @@ const getData = () => {
                     }
                 }).reduce((acc,curr)=>curr.concat(acc)).forEach((x) => {
                     const datetime = `${x.month}/${x.day}/${x.year}-${x.hour}`
-                    console.log(`${datetime} ${x.temp}`)
+                    // console.log(`${datetime} ${x.temp}`)
                     asyncsadd("devices", device).then()
                     asyncsadd("datetime", datetime).then()
                     asynchset(datetime+'-'+device, 'temp', x.temp).then()
