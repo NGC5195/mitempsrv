@@ -3,8 +3,8 @@ const asyncRedis = require('async-redis')
 const redisClient = asyncRedis.createClient()
 "use strict"
 
-const precise = (x) => Number.parseFloat(x).toPrecision(2)
-
+const precise = (x) => Math.round((x + Number.EPSILON) * 100) / 100
+const pad02 = (x) => x.toFixed(0).padStart(2, '0')
 
 const getData = () => {
     var request = require('xhr-request')
@@ -16,32 +16,65 @@ const getData = () => {
         return await redisClient.hset(key, field, value)
     }
     
-    
     request('http://www.infoclimat.fr/public-api/gfs/json?_ll=48.9891224,0.7801129&_auth=VU8DFFMtVXdTflZhUyVQeQVtATRZLwEmUy8GZQ1oUi9TOQBjAGtWNVQ6WyYEKws%2FUn8AZwg%2FAzoBYFUzXy0Df1U1A2dTM1U%2FUz9WNlNhUHsFKQF8WWcBJlMvBmkNZFIvUzIAZABkVipUOVs4BDcLIVJgAGgIPgMkAX1VM183A2hVMQNjUzBVNlM1VjxTZFB7BSkBZFkzATBTZAY1DWVSMVMzAGcAa1YzVDxbOQQ9CyFSYABpCDcDOQFlVTNfMQNhVSkDeFNJVURTIVZ0UyFQMQVwAXxZMwFnU2Q%3D&_c=7a9fd6c8622720cb15b71b1c00dcb792',
         {
             json: true
         },
         (err, data) => {
-            const device = 'prévision AJOU'
-            asyncsadd("devices", device).then()
+            var dataArray = []
             if (err) throw err
             if (data.message == "OK" && data.request_state == "200") {
                 Object.keys(data).forEach((key) => {
                     const obj = data[key];
                     if (obj.hasOwnProperty('temperature')) {
-                        const year = key.substr(0, 4)
-                        const month = key.substr(5, 2)
-                        const day = key.substr(8, 2)
-                        const hour = key.substr(11, 2)
-                        const datetime = `${month}/${day}/${year}-${hour}`
-                        const temp = precise(obj.temperature['2m'] - 273.15)
-                        const hum = precise(obj.humidite['2m'])
-
-                        // console.log(`${datetime} : ${temp}`)
-                        asyncsadd("datetime", datetime).then()
-                        asynchset(datetime+'-'+device, 'temp', temp).then()
-                        asynchset(datetime+'-'+device, 'hum', hum).then()
+                        dataArray.push(
+                            {
+                                year: key.substr(0, 4),
+                                month: key.substr(5, 2),
+                                day: key.substr(8, 2),
+                                hour: key.substr(11, 2),
+                                temp: precise(obj.temperature['2m'] - 273.15),
+                                hum: precise(obj.humidite['2m'])
+                            }
+                        )
                     }
+                })
+                dataArray.map((curr, idx, array) => {
+                    if (idx == 0) {
+                        return curr
+                    } else {
+                        var arr2 = []
+                        arr2.push(
+                            {
+                                year: curr.year,
+                                month: curr.month,
+                                day: curr.day,
+                                hour: pad02(curr.hour-2),
+                                temp: precise(array[idx-1].temp + ((array[idx].temp - array[idx-1].temp)/3)),
+                                hum: precise(array[idx-1].hum + ((array[idx].hum - array[idx-1].hum)/3))
+                            }
+                        )
+                        arr2.push(
+                            {
+                                year: curr.year,
+                                month: curr.month,
+                                day: curr.day,
+                                hour: pad02(curr.hour-1),
+                                temp: precise(array[idx-1].temp + ((array[idx].temp - array[idx-1].temp)/3*2)),
+                                hum: precise(array[idx-1].hum + ((array[idx].hum - array[idx-1].hum)/3*2))
+                            }
+                        )
+                        arr2.push(curr)
+                        return arr2
+                    }
+                }).reduce((acc,curr)=>curr.concat(acc)).forEach((x) => {
+                    const datetime = `${x.month}/${x.day}/${x.year}-${x.hour}`
+                    const device = 'prévision AJOU'
+                    console.log(`${datetime} ${x.temp}`)
+                    asyncsadd("devices", device).then()
+                    asyncsadd("datetime", datetime).then()
+                    asynchset(datetime+'-'+device, 'temp', x.temp).then()
+                    asynchset(datetime+'-'+device, 'hum', x.hum).then()
                 })
             }
             console.log('done.')

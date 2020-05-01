@@ -27,7 +27,7 @@ const myChart = new Chart(ctx, {
         aspectRatio: 2.5,
         elements: {
             point:{
-                radius: 0
+                radius: 2
             }
         },
         scales: {
