@@ -45,60 +45,62 @@ const smembers = async (key) => {
 const gettemphum = async (key) => {
   const temp = await redisClient.hget(key, 'temp')
   const hum = await redisClient.hget(key, 'hum')
-  return {temp, hum}
+  return { temp, hum }
 }
 
 const formatDateTime = (str) => {
   const time = str.split('-');
   const date = time[0].split('/');
-  return date[1]+'/'+date[0]+'/'+date[2]+' '+time[1]+'h'
+  return date[1] + '/' + date[0] + '/' + date[2] + ' ' + time[1] + 'h'
 }
 
 const loadDataFromRedis = async (depth, callback) => {
   const tempDevices = await smembers("devices")
   const tempDateTime = await smembers("datetime")
 
-  var tempDateTimeSorted = tempDateTime.sort( (a, b) => {
+  var tempDateTimeSorted = tempDateTime.sort((a, b) => {
     const atime = a.split('-');
     const adate = atime[0].split('/');
-    const aa = adate[2]+adate[0]+adate[1]+atime[1]
+    const aa = adate[2] + adate[0] + adate[1] + atime[1]
     const btime = b.split('-');
     const bdate = btime[0].split('/');
-    const bb = bdate[2]+bdate[0]+bdate[1]+btime[1]
+    const bb = bdate[2] + bdate[0] + bdate[1] + btime[1]
     return aa.localeCompare(bb);;
   });
 
   if (tempDateTimeSorted.length > depth) {
     tempDateTimeSorted = tempDateTimeSorted.slice(Math.max(tempDateTimeSorted.length - depth, 0))
-  }  
+  }
 
-  Promise.all(tempDevices.map((dv) => { 
-    return Promise.all(tempDateTimeSorted.map((dt) => { 
-      return gettemphum(dt+'-'+dv).then((val) => { 
+  Promise.all(tempDevices.map((dv) => {
+    return Promise.all(tempDateTimeSorted.map((dt) => {
+      return gettemphum(dt + '-' + dv).then((val) => {
         return val
       });
-    })).then((data) => {
-        return [{
-          label: 'Temp: '+dv,
-          fill: false,
-          borderColor: 'green',
-          data: data.map(o=>o.temp),
-          yAxisID: 'right-y-axis'
-        },
-        {
-          label: 'Hum: '+dv,
-          fill: false,
-          borderColor: 'blue',
-          data: data.map(o=>o.hum),
-          yAxisID: 'left-y-axis'
-        }]
+    })).then(async (data) => {
+      const tempColor = await redisClient.hget(dv, 'tempColor')
+      const humColor = await redisClient.hget(dv, 'humColor')
+      return [{
+        label: 'Temp: ' + dv,
+        fill: false,
+        borderColor: tempColor,
+        data: data.map(o => o.temp),
+        yAxisID: 'right-y-axis'
+      },
+      {
+        label: 'Hum: ' + dv,
+        fill: false,
+        borderColor: humColor,
+        data: data.map(o => o.hum),
+        yAxisID: 'left-y-axis'
+      }]
     })
   })).then((alldata) => {
     const message = {
-      labels: tempDateTimeSorted.map(x=>formatDateTime(x)),
-      datasets: alldata.reduce((acc,curr)=>curr.concat(acc)),
+      labels: tempDateTimeSorted.map(x => formatDateTime(x)),
+      datasets: alldata.reduce((acc, curr) => curr.concat(acc)),
       borderWidth: 1
-    }    
+    }
     callback(message)
   })
 }
@@ -121,20 +123,20 @@ app.use(session)
 app.use(favicon(__dirname + '/icon.png'))
 
 // service to load next level of the WATS tree on AJAX request
-app.get('/data',  (req, res) => {
-  loadDataFromRedis(parseInt(req.query.depth), (message)=> {
+app.get('/data', (req, res) => {
+  loadDataFromRedis(parseInt(req.query.depth), (message) => {
     sendJsonString(JSON.stringify(message), req, res)
   })
 })
 
-app.use( (req, res) => {
+app.use((req, res) => {
   res.type('text/plain')
   res.status('404')
   res.send('404 - Not Found')
 })
 
 
-const server  = require("http").createServer(app);
+const server = require("http").createServer(app);
 // http listener
 server.listen(app.get('port'), function (req, res) {
   console.log('----- ' + new Date)

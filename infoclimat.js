@@ -22,6 +22,7 @@ const getData = () => {
         },
         (err, data) => {
             var dataArray = []
+            const device = 'prévision AJOU'
             if (err) throw err
             if (data.message == "OK" && data.request_state == "200") {
                 Object.keys(data).forEach((key) => {
@@ -69,7 +70,6 @@ const getData = () => {
                     }
                 }).reduce((acc,curr)=>curr.concat(acc)).forEach((x) => {
                     const datetime = `${x.month}/${x.day}/${x.year}-${x.hour}`
-                    const device = 'prévision AJOU'
                     console.log(`${datetime} ${x.temp}`)
                     asyncsadd("devices", device).then()
                     asyncsadd("datetime", datetime).then()
@@ -77,6 +77,10 @@ const getData = () => {
                     asynchset(datetime+'-'+device, 'hum', x.hum).then()
                 })
             }
+            asynchset(device, 'tempColor', 'rgb(102, 153, 255)').then()
+            asynchset(device, 'humColor', 'rgb(102, 153, 0)').then()
+            asynchset('58:2d:34:39:77:eb', 'tempColor', 'green').then()
+            asynchset('58:2d:34:39:77:eb', 'humColor', 'blue').then()
             console.log('done.')
             process.exit(0);
         })
