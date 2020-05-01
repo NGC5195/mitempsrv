@@ -77,7 +77,7 @@ const getData = () => {
                     asynchset(datetime+'-'+device, 'hum', x.hum).then()
                 })
             }
-            asynchset(device, 'tempColor', 'rgb(102, 153, 0)').then()
+            asynchset(device, 'tempColor', 'rgb(153, 230, 0)').then()
             asynchset(device, 'humColor', 'rgb(102, 153, 255)').then()
             asynchset('58:2d:34:39:77:eb', 'tempColor', 'green').then()
             asynchset('58:2d:34:39:77:eb', 'humColor', 'blue').then()
