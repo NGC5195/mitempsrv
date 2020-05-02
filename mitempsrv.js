@@ -54,9 +54,17 @@ const formatDateTime = (str) => {
   return date[1] + '/' + date[0] + '/' + date[2] + ' ' + time[1] + 'h'
 }
 
-const loadDataFromRedis = async (depth, callback) => {
+const loadDataFromRedis = async (depth, device, callback) => {
   const tempDevices = await smembers("devices")
   const tempDateTime = await smembers("datetime")
+
+  const filteredDevices = tempDevices.filter((x) => {
+    if (device === 'All' || device == x) {
+      return 1
+    } else {
+      return 0
+    }
+  })
 
   var tempDateTimeSorted = tempDateTime.sort((a, b) => {
     const atime = a.split('-');
@@ -72,7 +80,7 @@ const loadDataFromRedis = async (depth, callback) => {
     tempDateTimeSorted = tempDateTimeSorted.slice(Math.max(tempDateTimeSorted.length - depth, 0))
   }
 
-  Promise.all(tempDevices.map((dv) => {
+  Promise.all(filteredDevices.map((dv) => {
     return Promise.all(tempDateTimeSorted.map((dt) => {
       return gettemphum(dt + '-' + dv).then((val) => {
         return val
@@ -124,14 +132,31 @@ app.use(favicon(__dirname + '/icon.png'))
 
 // service to load next level of the WATS tree on AJAX request
 app.get('/data', (req, res) => {
-  loadDataFromRedis(parseInt(req.query.depth), (message) => {
+  loadDataFromRedis(parseInt(req.query.depth), req.query.device, (message) => {
     sendJsonString(JSON.stringify(message), req, res)
   })
 })
 
+app.get('/devices', (req, res) => {
+  redisClient.smembers('devices').then((data) => {
+    const devices = data.map((x) => {
+      return `           <option value="${x}">${x}</option>\n`
+    })
+    res.type('text/html')
+    var innerHTML = '\
+        <label for="devices-select">Thermomète: </label>\n\
+        <select name="devices" id="devices-select" onchange="selectdevices(this)">\n\
+           <option value="All">Tous</option>\n`'
+    innerHTML += devices.reduce((x, y) => x + y)
+    innerHTML += '        </select>'
+    res.send(innerHTML)
+  })
+})
+
+
 app.use((req, res) => {
   res.type('text/plain')
-  res.status('404')
+  res.sendStatus('404')
   res.send('404 - Not Found')
 })
 

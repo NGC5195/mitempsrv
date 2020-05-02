@@ -2,8 +2,8 @@ const ctx = document.getElementById('myChart').getContext('2d')
 const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Noc', 'Déc']
 
 const formatDateTime = (str) => {
-    const time = str.split(' ');
-    const date = time[0].split('/');
+    const time = str.split(' ')
+    const date = time[0].split('/')
     return {
         day: date[0],
         month: date[1],
@@ -12,13 +12,59 @@ const formatDateTime = (str) => {
     }
   }
 const selectPeriod = (o) => {
-    const value = o.options[o.selectedIndex].value;
-    localStorage.setItem('depth', value)
-    loadData(value) 
+    const depth = o.options[o.selectedIndex].value
+    localStorage.setItem('depth', depth)
+    const device = localStorage.getItem('device')
+    loadData(depth, device)
 }
+
+const selectdevices = (o) => {
+    const device = o.options[o.selectedIndex].value
+    localStorage.setItem('device', device)
+    const depth = localStorage.getItem('depth')
+    loadData(depth, device)
+}
+
+const includeDevices = () => {
+    var z, i, elmnt, file, xhttp;
+
+    z = document.getElementsByTagName("*");  
+    for (i = 0; i < z.length; i++) {
+      elmnt = z[i];
+      file = elmnt.getAttribute("w3-include-devices");
+      if (file) {
+        xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4) {
+            if (this.status == 200) {
+                elmnt.innerHTML = this.responseText;
+            }
+            if (this.status == 404) {elmnt.innerHTML = "Page not found.";}
+            elmnt.removeAttribute("w3-include-menu");
+          }
+        } 
+        xhttp.open("GET", file, true);
+        xhttp.send();
+        return;
+      }
+    }
+}
+
+Chart.controllers.LineAlt = Chart.controllers.line.extend({
+    type: 'LineAlt',
+    initialize: function(chart, datasetIndex){
+        Chart.controllers.line.prototype.initialize.apply(this, arguments)
+        this.originalUpdate = this.draw
+        this.draw = function () {
+            this.originalUpdate()
+            // this.chart.ctx.fillStyle = 'rgba(100,100,100,0.1)'
+            // chart.ctx.fillRect(0, 0, chart.width, chart.height)
+        }
+    }
+})
   
 const myChart = new Chart(ctx, {
-    type: 'line',
+    type: 'LineAlt',
     data: {},
     options: {
         animation: false,
@@ -29,6 +75,9 @@ const myChart = new Chart(ctx, {
             point:{
                 radius: 1
             }
+        },
+        tooltips: {
+            mode: 'nearest'
         },
         scales: {
             yAxes: [{
@@ -66,9 +115,9 @@ const myChart = new Chart(ctx, {
     }
 })
 
-const loadData = (depth) => {
+const loadData = (depth, device) => {
     var xhr = new XMLHttpRequest()
-    xhr.open("GET", `./data?depth=${depth}`)
+    xhr.open("GET", `./data?depth=${depth}&device=${device}`)
     xhr.onreadystatechange = () => { 
         if (xhr.readyState === 4 && xhr.status === 200) {
             const jsondata = JSON.parse(xhr.responseText)
@@ -80,9 +129,14 @@ const loadData = (depth) => {
 }
 
 var depth = localStorage.getItem('depth')
-if (depth == "undefined") {
+var device = localStorage.getItem('device')
+if (depth == undefined) {
     depth = 24
 }
-document.getElementById('period-select').value = depth;
-loadData(depth)
+if (device == undefined) {
+    device = 'All'
+}
+includeDevices()
+document.getElementById('period-select').value = depth
+loadData(depth, device)
 

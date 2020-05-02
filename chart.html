@@ -10,17 +10,27 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="./dist/Chart.js"></script>
 </head>
+
 <body>
     <div id="header">
-        <label for="period-select">Pédiode des mesures: </label>
-        <select name="periods" id="period-select" onchange="selectPeriod(this)">
-            <option value="24">24h</option>
-            <option value="48">48h</option>
-            <option value="168">Semaine</option>
-            <option value="672">Mois</option>
-        </select>
+        <span style="display:flex;">
+            <div>
+                <label for="period-select">Période: </label>
+                <select name="periods" id="period-select" onchange="selectPeriod(this)">
+                    <option value="24">24h</option>
+                    <option value="48">48h</option>
+                    <option value="168">Semaine</option>
+                    <option value="672">Mois</option>
+                </select>
+            </div>
+            <div>
+                &nbsp;&nbsp;&nbsp;
+            </div>
+            <div w3-include-devices="http://127.0.0.1:3000/devices"></div>
+        </span>
         <canvas id="myChart"></canvas>
+        <script src="./linechart.js"></script>
     </div>
 </body>
-<script src="./chart.js"></script>
+
 </html>
