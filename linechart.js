@@ -18,6 +18,10 @@ const selectPeriod = (o) => {
     loadData(depth, device)
 }
 
+const selectforecats = (o) => {
+
+}
+
 const selectdevices = (o) => {
     const device = o.options[o.selectedIndex].value
     localStorage.setItem('device', device)

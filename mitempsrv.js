@@ -5,17 +5,6 @@ const redisClient = asyncRedis.createClient()
 
 const showMemoryUsage = () => console.log(' >used heap size:' + (v8.getHeapStatistics().used_heap_size / 1024 / 1024).toFixed(2) + ' Mo - heap size limit: ' + (v8.getHeapStatistics().heap_size_limit / 1024 / 1024).toFixed(2) + ' Mo ' + (v8.getHeapStatistics().used_heap_size / v8.getHeapStatistics().heap_size_limit * 100).toFixed(2) + '%')
 
-
-String.prototype.toCamelCase = () => {
-  if (this.length == 2) {
-    return this
-  } else {
-    return this.replace(/(?:^\w|[A-Z]|\b\w)/g, function (letter, index) {
-      return index == 0 ? letter.toUpperCase() : letter.toLowerCase()
-    }).replace(/\s+/g, '')
-  }
-}
-
 const IsJsonString = (str) => {
   try {
     JSON.parse(str)
@@ -46,6 +35,14 @@ const gettemphum = async (key) => {
   const temp = await redisClient.hget(key, 'temp')
   const hum = await redisClient.hget(key, 'hum')
   return { temp, hum }
+}
+
+const deviceInfo = async () => {
+  const devices = await redisClient.smembers('devices')
+  return Promise.all(devices.map(async (x) => {
+    const label = await redisClient.hget(x, 'label')
+    return { id: x, label: label }
+  }))
 }
 
 const formatDateTime = (str) => {
@@ -88,15 +85,16 @@ const loadDataFromRedis = async (depth, device, callback) => {
     })).then(async (data) => {
       const tempColor = await redisClient.hget(dv, 'tempColor')
       const humColor = await redisClient.hget(dv, 'humColor')
+      const label = await redisClient.hget(dv, 'label')
       return [{
-        label: 'Temp: ' + dv,
+        label: 'Temp: ' + label,
         fill: false,
         borderColor: tempColor,
         data: data.map(o => o.temp),
         yAxisID: 'right-y-axis'
       },
       {
-        label: 'Hum: ' + dv,
+        label: 'Hum: ' + label,
         fill: false,
         borderColor: humColor,
         data: data.map(o => o.hum),
@@ -130,7 +128,6 @@ app.use(express.static(__dirname + '/.'))
 app.use(session)
 app.use(favicon(__dirname + '/icon.png'))
 
-// service to load next level of the WATS tree on AJAX request
 app.get('/data', (req, res) => {
   loadDataFromRedis(parseInt(req.query.depth), req.query.device, (message) => {
     sendJsonString(JSON.stringify(message), req, res)
@@ -138,15 +135,15 @@ app.get('/data', (req, res) => {
 })
 
 app.get('/devices', (req, res) => {
-  redisClient.smembers('devices').then((data) => {
-    const devices = data.map((x) => {
-      return `           <option value="${x}">${x}</option>\n`
+  deviceInfo().then((dvlist) => {
+    const devices = dvlist.map((dv) => {
+      return `           <option value="${dv.id}">${dv.label}</option>\n`
     })
     res.type('text/html')
     var innerHTML = '\
-        <label for="devices-select">Thermomète: </label>\n\
-        <select name="devices" id="devices-select" onchange="selectdevices(this)">\n\
-           <option value="All">Tous</option>\n`'
+          <label for="devices-select">Thermomète: </label>\n\
+          <select name="devices" id="devices-select" onchange="selectdevices(this)">\n\
+             <option value="All">Tous</option>\n`'
     innerHTML += devices.reduce((x, y) => x + y)
     innerHTML += '        </select>'
     res.send(innerHTML)

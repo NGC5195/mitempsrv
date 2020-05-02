@@ -15,7 +15,7 @@
     <div id="header">
         <span style="display:flex;">
             <div>
-                <label for="period-select">Période: </label>
+                <label for="period-select">Historique: </label>
                 <select name="periods" id="period-select" onchange="selectPeriod(this)">
                     <option value="24">24h</option>
                     <option value="48">48h</option>
@@ -23,9 +23,16 @@
                     <option value="672">Mois</option>
                 </select>
             </div>
+            <div>&nbsp;&nbsp;&nbsp;</div>
             <div>
-                &nbsp;&nbsp;&nbsp;
+                <label for="forecats-select">Prévision: </label>
+                <select name="forecats" id="forecats-select" onchange="selectforecats(this)">
+                    <option value="24">24h</option>
+                    <option value="48">48h</option>
+                    <option value="168">Semaine</option>
+                </select>
             </div>
+            <div>&nbsp;&nbsp;&nbsp;</div>
             <div w3-include-devices="http://127.0.0.1:3000/devices"></div>
         </span>
         <canvas id="myChart"></canvas>

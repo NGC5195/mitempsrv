@@ -24,7 +24,7 @@ const getData = () => {
         },
         (err, data) => {
             var dataArray = []
-            const device = 'prévision AJOU'
+            const device = 'infoclimat1'
             if (err) throw err
             if (data.message == "OK" && data.request_state == "200") {
                 Object.keys(data).forEach((key) => {
@@ -81,8 +81,10 @@ const getData = () => {
             }
             asynchset(device, 'tempColor', 'rgb(221, 255, 153)').then()
             asynchset(device, 'humColor', 'rgb(204, 221, 255)').then()
+            asynchset(device, 'label', 'Prévision Ajou').then()
             asynchset('58:2d:34:39:77:eb', 'tempColor', 'green').then()
             asynchset('58:2d:34:39:77:eb', 'humColor', 'blue').then()
+            asynchset('58:2d:34:39:77:eb', 'label', 'Thermo 1').then()
             console.log('done.')
             process.exit(0);
         })
