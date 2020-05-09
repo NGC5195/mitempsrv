@@ -54,7 +54,7 @@ const includeDevices = (dev) => {
             elmnt.removeAttribute("w3-include-menu");
           }
         } 
-        xhttp.open("GET", file, true);
+        xhttp.open("GET", "./"+file, true);
         xhttp.send();
         return;
       }
