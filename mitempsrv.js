@@ -5,6 +5,8 @@ const redisClient = asyncRedis.createClient()
 
 const showMemoryUsage = () => console.log(' >used heap size:' + (v8.getHeapStatistics().used_heap_size / 1024 / 1024).toFixed(2) + ' Mo - heap size limit: ' + (v8.getHeapStatistics().heap_size_limit / 1024 / 1024).toFixed(2) + ' Mo ' + (v8.getHeapStatistics().used_heap_size / v8.getHeapStatistics().heap_size_limit * 100).toFixed(2) + '%')
 
+const pad02 = (x) => x.toFixed(0).padStart(2, '0')
+
 const IsJsonString = (str) => {
   try {
     JSON.parse(str)
@@ -51,9 +53,10 @@ const formatDateTime = (str) => {
   return date[1] + '/' + date[0] + '/' + date[2] + ' ' + time[1] + 'h'
 }
 
-const loadDataFromRedis = async (depth, device, callback) => {
+const loadDataFromRedis = async (depth, forecast, device, callback) => {
   const tempDevices = await smembers("devices")
   const tempDateTime = await smembers("datetime")
+  var currentTemp = 0, maxTemp= 0, minTemp = 999;
 
   const filteredDevices = tempDevices.filter((x) => {
     if (device === 'All' || device == x) {
@@ -73,12 +76,27 @@ const loadDataFromRedis = async (depth, device, callback) => {
     return aa.localeCompare(bb);;
   });
 
-  if (tempDateTimeSorted.length > depth) {
-    tempDateTimeSorted = tempDateTimeSorted.slice(Math.max(tempDateTimeSorted.length - depth, 0))
+  const d = new Date();
+  const current = `${pad02(d.getMonth()+1)}/${pad02(d.getDate())}/${d.getFullYear()}-${pad02(d.getHours())}`
+  const currentIndex = tempDateTimeSorted.findIndex(element => element == current);
+
+  if (currentIndex+forecast > tempDateTimeSorted.length) {
+    forecast = tempDateTimeSorted.length - currentIndex
+  }
+  
+  if (currentIndex-depth < 0) {
+    depth = currentIndex
+  }
+
+  var tempDateTimeFiltered = []
+  for (let i = 0; i < tempDateTimeSorted.length; i++) {
+    if ((i >= currentIndex-depth) && (i <= currentIndex+forecast)) {
+      tempDateTimeFiltered.push(tempDateTimeSorted[i])
+    }
   }
 
   Promise.all(filteredDevices.map((dv) => {
-    return Promise.all(tempDateTimeSorted.map((dt) => {
+    return Promise.all(tempDateTimeFiltered.map((dt) => {
       return gettemphum(dt + '-' + dv).then((val) => {
         return val
       });
@@ -103,9 +121,14 @@ const loadDataFromRedis = async (depth, device, callback) => {
     })
   })).then((alldata) => {
     const message = {
-      labels: tempDateTimeSorted.map(x => formatDateTime(x)),
-      datasets: alldata.reduce((acc, curr) => curr.concat(acc)),
-      borderWidth: 1
+      chartdata: {
+        labels: tempDateTimeFiltered.map(x => formatDateTime(x)),
+        datasets: alldata.reduce((acc, curr) => curr.concat(acc)),
+        borderWidth: 1
+      },
+      currentTemp: currentTemp,
+      minTemp: minTemp,
+      maxTemp: maxTemp
     }
     callback(message)
   })
@@ -129,7 +152,7 @@ app.use(session)
 app.use(favicon(__dirname + '/icon.png'))
 
 app.get('/data', (req, res) => {
-  loadDataFromRedis(parseInt(req.query.depth), req.query.device, (message) => {
+  loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
     sendJsonString(JSON.stringify(message), req, res)
   })
 })

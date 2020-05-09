@@ -11,7 +11,7 @@
     <script src="./dist/Chart.js"></script>
 </head>
 
-<body>
+<body style="font-family:candara,courier,arial;">
     <div id="header">
         <span style="display:flex;">
             <div>
@@ -19,16 +19,18 @@
                 <select name="periods" id="period-select" onchange="selectPeriod(this)">
                     <option value="24">24h</option>
                     <option value="48">48h</option>
+                    <option value="72">72h</option>
                     <option value="168">Semaine</option>
                     <option value="672">Mois</option>
                 </select>
             </div>
             <div>&nbsp;&nbsp;&nbsp;</div>
             <div>
-                <label for="forecats-select">Prévision: </label>
-                <select name="forecats" id="forecats-select" onchange="selectforecats(this)">
+                <label for="forecast-select">Prévision: </label>
+                <select name="forecast" id="forecast-select" onchange="selectforecast(this)">
                     <option value="24">24h</option>
                     <option value="48">48h</option>
+                    <option value="72">72h</option>
                     <option value="168">Semaine</option>
                 </select>
             </div>

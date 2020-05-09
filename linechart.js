@@ -15,21 +15,27 @@ const selectPeriod = (o) => {
     const depth = o.options[o.selectedIndex].value
     localStorage.setItem('depth', depth)
     const device = localStorage.getItem('device')
-    loadData(depth, device)
+    const forecast = localStorage.getItem('forecast')
+    loadData(depth, forecast, device)
 }
 
-const selectforecats = (o) => {
-
+const selectforecast = (o) => {
+    const forecast = o.options[o.selectedIndex].value
+    localStorage.setItem('forecast', forecast)
+    const device = localStorage.getItem('device')
+    const depth = localStorage.getItem('depth')
+    loadData(depth, forecast, device)
 }
 
 const selectdevices = (o) => {
     const device = o.options[o.selectedIndex].value
     localStorage.setItem('device', device)
     const depth = localStorage.getItem('depth')
-    loadData(depth, device)
+    const forecast = localStorage.getItem('forecast')
+    loadData(depth, forecast, device)
 }
 
-const includeDevices = () => {
+const includeDevices = (dev) => {
     var z, i, elmnt, file, xhttp;
 
     z = document.getElementsByTagName("*");  
@@ -42,6 +48,7 @@ const includeDevices = () => {
           if (this.readyState == 4) {
             if (this.status == 200) {
                 elmnt.innerHTML = this.responseText;
+                document.getElementById('devices-select').value = device
             }
             if (this.status == 404) {elmnt.innerHTML = "Page not found.";}
             elmnt.removeAttribute("w3-include-menu");
@@ -119,13 +126,13 @@ const myChart = new Chart(ctx, {
     }
 })
 
-const loadData = (depth, device) => {
+const loadData = (depth, forecast, device) => {
     var xhr = new XMLHttpRequest()
-    xhr.open("GET", `./data?depth=${depth}&device=${device}`)
+    xhr.open("GET", `./data?depth=${depth}&forecast=${forecast}&device=${device}`)
     xhr.onreadystatechange = () => { 
         if (xhr.readyState === 4 && xhr.status === 200) {
             const jsondata = JSON.parse(xhr.responseText)
-            myChart.data = jsondata
+            myChart.data = jsondata.chartdata
             myChart.update()
         }
     }
@@ -134,13 +141,18 @@ const loadData = (depth, device) => {
 
 var depth = localStorage.getItem('depth')
 var device = localStorage.getItem('device')
+var forecast = localStorage.getItem('forecast')
 if (depth == undefined) {
     depth = 24
 }
 if (device == undefined) {
     device = 'All'
 }
-includeDevices()
+if (forecast == undefined) {
+    forecast = 24
+}
+includeDevices(device)
 document.getElementById('period-select').value = depth
-loadData(depth, device)
+document.getElementById('forecast-select').value = forecast
+loadData(depth, forecast, device)
 
