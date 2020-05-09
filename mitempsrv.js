@@ -152,13 +152,13 @@ app.use('/rasp', express.static(__dirname + '/.'))
 app.use(session)
 app.use(favicon(__dirname + '/icon.png'))
 
-app.get('/data', (req, res) => {
+app.get('/rasp/data', (req, res) => {
   loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
     sendJsonString(JSON.stringify(message), req, res)
   })
 })
 
-app.get('/devices', (req, res) => {
+app.get('/rasp/devices', (req, res) => {
   deviceInfo().then((dvlist) => {
     const devices = dvlist.map((dv) => {
       return `           <option value="${dv.id}">${dv.label}</option>\n`
