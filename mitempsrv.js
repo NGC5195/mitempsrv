@@ -177,7 +177,6 @@ app.get('/devices', (req, res) => {
 app.use((req, res) => {
   res.type('text/plain')
   res.sendStatus('404')
-  res.send('404 - Not Found')
 })
 
 
@@ -185,7 +184,7 @@ const server = require("http").createServer(app);
 // http listener
 server.listen(app.get('port'), function (req, res) {
   console.log('----- ' + new Date)
-  console.log('Server started on [http://127.0.0.1:' + app.get('port') + '/chart.html] - Press Ctrl+C to terminate.')
+  console.log('Server started on [http://127.0.0.1:' + app.get('port') + '/meteo.html] - Press Ctrl+C to terminate.')
   showMemoryUsage()
 })
 
