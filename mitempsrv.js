@@ -148,6 +148,7 @@ var session = require('express-session')({
 app.set('port', process.env.PORT || 3000)
 app.use(express.static(__dirname + '/css/'))
 app.use(express.static(__dirname + '/dist/'))
+app.use(express.static(__dirname + '/.'))
 app.use(session)
 app.use(favicon(__dirname + '/icon.png'))
 
