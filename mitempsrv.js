@@ -149,7 +149,7 @@ app.set('port', process.env.PORT || 3000)
 app.use('/rasp', express.static(__dirname + '/css/'))
 app.use('/rasp', express.static(__dirname + '/dist/'))
 app.use('/rasp', express.static(__dirname + '/.'))
-app.use(favicon(__dirname + '/icon.png'))
+app.use('/rasp', favicon(__dirname + '/icon.png'))
 app.use(session)
 
 app.get('/rasp/data', (req, res) => {
