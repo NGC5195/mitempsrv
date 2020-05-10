@@ -127,13 +127,12 @@ const myChart = new Chart(ctx, {
 })
 
 const myTable = new Tabulator("#summary", {
-    data: [],
     layout:"fitColumns",
     columns:[ 
         {title:"Name", field:"label"},
         {title:"Min", field:"min"},
         {title:"Max", field:"max"},
-        {title:"Current", field:"curr"},
+        {title:"Cur", field:"curr"},
     ],
 })
 
