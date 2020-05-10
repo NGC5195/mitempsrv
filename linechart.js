@@ -35,23 +35,23 @@ const selectdevices = (o) => {
     loadData(depth, forecast, device)
 }
 
-const includeDevices = (dev) => {
+const includeInnerHtml = (id, callback) => {
     var z, i, elmnt, file, xhttp;
 
     z = document.getElementsByTagName("*");  
     for (i = 0; i < z.length; i++) {
       elmnt = z[i];
-      file = elmnt.getAttribute("w3-include-devices");
-      if (file) {
+      file = elmnt.getAttribute("w3-include-html");
+      if (file === id) {
         xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function() {
           if (this.readyState == 4) {
             if (this.status == 200) {
                 elmnt.innerHTML = this.responseText;
-                document.getElementById('devices-select').value = device
             }
             if (this.status == 404) {elmnt.innerHTML = "Page not found.";}
-            elmnt.removeAttribute("w3-include-menu");
+            elmnt.removeAttribute("w3-include-html");
+            callback()
           }
         } 
         xhttp.open("GET", "./"+file, true);
@@ -126,6 +126,17 @@ const myChart = new Chart(ctx, {
     }
 })
 
+const myTable = new Tabulator("#summary", {
+    data: [],
+    layout:"fitColumns",
+    columns:[ 
+        {title:"Name", field:"label", width:500},
+        {title:"Min", field:"min"},
+        {title:"Max", field:"max"},
+        {title:"Current", field:"curr"},
+    ],
+})
+
 const loadData = (depth, forecast, device) => {
     var xhr = new XMLHttpRequest()
     xhr.open("GET", `./data?depth=${depth}&forecast=${forecast}&device=${device}`)
@@ -134,10 +145,25 @@ const loadData = (depth, forecast, device) => {
             const jsondata = JSON.parse(xhr.responseText)
             myChart.data = jsondata.chartdata
             myChart.update()
+            myTable.setData(jsondata.summary)
         }
     }
     xhr.send(null)
 }
+
+const refresh = () => {
+    if (screen.orientation.type === 'landscape-primary') {
+        document.getElementById('myChart').style.display='block'
+        document.getElementById('summary').style.display='none'
+    } else if (screen.orientation.type === 'portrait-primary') {
+        document.getElementById('myChart').style.display='none'
+        document.getElementById('summary').style.display='block'
+    }
+}
+
+window.screen.orientation.addEventListener('change', function() {
+    refresh()
+});
 
 var depth = localStorage.getItem('depth')
 var device = localStorage.getItem('device')
@@ -151,8 +177,13 @@ if (device == undefined) {
 if (forecast == undefined) {
     forecast = 24
 }
-includeDevices(device)
+includeInnerHtml('devices', ()=> {
+    document.getElementById('devices-select').value = device
+})
 document.getElementById('period-select').value = depth
 document.getElementById('forecast-select').value = forecast
+
 loadData(depth, forecast, device)
+refresh()
+
 

@@ -66,6 +66,17 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
     }
   })
 
+  const getMinMax = (data, currIdx) => {
+    return data.reduce((acc, curr) => curr.concat(acc)).map((x) => {
+      return {
+        label: x.label,
+        min: Math.min.apply(Math, x.data.filter((x)=>x)),
+        max: Math.max.apply(Math, x.data.filter((x)=>x)),
+        curr: x.data[currIdx]
+      }
+    })
+  }
+
   var tempDateTimeSorted = tempDateTime.sort((a, b) => {
     const atime = a.split('-');
     const adate = atime[0].split('/');
@@ -126,9 +137,7 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
         datasets: alldata.reduce((acc, curr) => curr.concat(acc)),
         borderWidth: 1
       },
-      currentTemp: currentTemp,
-      minTemp: minTemp,
-      maxTemp: maxTemp
+      summary: getMinMax(alldata, depth)
     }
     callback(message)
   })
@@ -155,6 +164,15 @@ app.use(session)
 app.get('/rasp/data', (req, res) => {
   loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
     sendJsonString(JSON.stringify(message), req, res)
+  })
+})
+
+app.get('/rasp/summary', (req, res) => {
+  loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
+    res.type('text/html')
+    var innerHTML = "summary"
+    // message.summary
+    res.send(innerHTML)
   })
 })
 
