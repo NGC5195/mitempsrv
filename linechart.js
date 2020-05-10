@@ -129,10 +129,10 @@ const myChart = new Chart(ctx, {
 const myTable = new Tabulator("#summary", {
     layout:"fitColumns",
     columns:[ 
-        {title:"Name", field:"label", formatter:"html"},
-        {title:"Min", field:"min"},
-        {title:"Max", field:"max"},
-        {title:"Cur", field:"curr"},
+        {title:"Name", field:"label", width:"40%", formatter:"html"},
+        {title:"Min", field:"min", width:"20%"},
+        {title:"Max", field:"max", width:"20%"},
+        {title:"Cur", field:"curr", width:"20%"},
     ],
 })
 
