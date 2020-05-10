@@ -145,6 +145,7 @@ const loadData = (depth, forecast, device) => {
             myChart.data = jsondata.chartdata
             myChart.update()
             myTable.setData(jsondata.summary)
+            myTable.refresh
         }
     }
     xhr.send(null)
