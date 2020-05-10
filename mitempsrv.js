@@ -56,7 +56,6 @@ const formatDateTime = (str) => {
 const loadDataFromRedis = async (depth, forecast, device, callback) => {
   const tempDevices = await smembers("devices")
   const tempDateTime = await smembers("datetime")
-  var currentTemp = 0, maxTemp= 0, minTemp = 999;
 
   const filteredDevices = tempDevices.filter((x) => {
     if (device === 'All' || device == x) {
@@ -68,8 +67,9 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
 
   const getMinMax = (data, currIdx) => {
     return data.reduce((acc, curr) => curr.concat(acc)).map((x) => {
+      var label = x.label.replace(/Temp:/gi, '&#127777;').replace(/Hum:/gi, '&#x1F327;')
       return {
-        label: x.label,
+        label: label,
         min: Math.min.apply(Math, x.data.filter((x)=>x)),
         max: Math.max.apply(Math, x.data.filter((x)=>x)),
         curr: x.data[currIdx]

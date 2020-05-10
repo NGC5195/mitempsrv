@@ -129,7 +129,7 @@ const myChart = new Chart(ctx, {
 const myTable = new Tabulator("#summary", {
     layout:"fitColumns",
     columns:[ 
-        {title:"Name", field:"label"},
+        {title:"Name", field:"label", formatter:"html"},
         {title:"Min", field:"min"},
         {title:"Max", field:"max"},
         {title:"Cur", field:"curr"},
@@ -170,12 +170,15 @@ var device = localStorage.getItem('device')
 var forecast = localStorage.getItem('forecast')
 if (depth == undefined) {
     depth = 24
+    localStorage.setItem('depth', depth)
 }
 if (device == undefined) {
     device = 'All'
+    localStorage.setItem('device', device)
 }
 if (forecast == undefined) {
     forecast = 24
+    localStorage.setItem('forecast', forecast)
 }
 includeInnerHtml('devices', ()=> {
     document.getElementById('devices-select').value = device

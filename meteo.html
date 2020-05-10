@@ -7,19 +7,20 @@
     <title>Rasp Temp</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="christophe.saillard@protonmail.com" content="">
+    <link rel="stylesheet" href="./dist/tabulator_bootstrap4.min.css">
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="./dist/tabulator_materialize.min.css">
     <link rel="icon" type="image/png" href="favicon.ico" />
     <script type="text/javascript" src="./dist/Chart.js"></script>
     <script type="text/javascript" src="./dist/tabulator.min.js"></script>
 </head>
 
-<body style="font-family:candara,courier,arial;">
+<body style="font-family:candara,courier,arial; ">
     <div id="header">
-        <span style="display:flex;">
+        <span class="header">
             <div>
                 <label for="period-select">Historique: </label>
                 <select name="periods" id="period-select" onchange="selectPeriod(this)">
+                    <option value="0">Aucun</option>
                     <option value="24">24h</option>
                     <option value="48">48h</option>
                     <option value="72">72h</option>
@@ -31,6 +32,7 @@
             <div>
                 <label for="forecast-select">Prévision: </label>
                 <select name="forecast" id="forecast-select" onchange="selectforecast(this)">
+                    <option value="0">Aucun</option>
                     <option value="24">24h</option>
                     <option value="48">48h</option>
                     <option value="72">72h</option>
@@ -41,7 +43,7 @@
             <div w3-include-html="devices"></div>
         </span>
         <canvas id="myChart"></canvas>
-        <div id="summary"></div>
+        <div id="summary" class="table-sm"></div>
         <script src="./linechart.js"></script>
     </div>
 </body>
