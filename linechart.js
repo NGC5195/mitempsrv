@@ -130,7 +130,7 @@ const myTable = new Tabulator("#summary", {
     data: [],
     layout:"fitColumns",
     columns:[ 
-        {title:"Name", field:"label", width:500},
+        {title:"Name", field:"label"},
         {title:"Min", field:"min"},
         {title:"Max", field:"max"},
         {title:"Current", field:"curr"},
