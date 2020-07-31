@@ -37,11 +37,8 @@ const selectdevices = (o) => {
 
 const refreshDevices = (id, callback) => {
     xhttp = new XMLHttpRequest()
-    document.getElementById('comment').innerHTML = 'test'
     xhttp.onreadystatechange = function() {
-        document.getElementById('comment').innerHTML = 'onreadystatechange'
         if (this.readyState == 4 && this.status == 200) {
-            document.getElementById('comment').innerHTML = 'onreadystatechange 4 and 200'
             const options = JSON.parse(this.responseText)
             options.push({id: 'All', label: 'Tous'})
             options.forEach(el => {
@@ -159,9 +156,11 @@ const refresh = () => {
     } 
 }
 
-// window.screen.orientation.addEventListener('change', function() {
-//     refresh()
-// });
+if (window.screen.orientation) {
+    window.screen.orientation.addEventListener('change', function() {
+        refresh()
+    });
+}
 var depth = localStorage.getItem('depth')
 var device = localStorage.getItem('device')
 var forecast = localStorage.getItem('forecast')
@@ -185,4 +184,3 @@ document.getElementById('forecast-select').value = forecast
 
 loadData(depth, forecast, device)
 refresh()
-document.getElementById('comment').innerHTML = 'done'
