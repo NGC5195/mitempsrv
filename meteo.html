@@ -40,7 +40,11 @@
                 </select>
             </div>
             <div>&nbsp;&nbsp;&nbsp;</div>
-            <div w3-include-html="devices"></div>
+            <div>
+                <label for="devices-select">Prévision: </label>
+                <select name="devices" id="devices-select" onchange="selectdevices(this)">
+                </select>
+            </div>
         </span>
         <canvas id="myChart"></canvas>
         <div id="summary" class="table-sm"></div>

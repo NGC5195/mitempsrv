@@ -35,30 +35,23 @@ const selectdevices = (o) => {
     loadData(depth, forecast, device)
 }
 
-const includeInnerHtml = (id, callback) => {
-    var z, i, elmnt, file, xhttp;
-
-    z = document.getElementsByTagName("*");  
-    for (i = 0; i < z.length; i++) {
-      elmnt = z[i];
-      file = elmnt.getAttribute("w3-include-html");
-      if (file === id) {
-        xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-          if (this.readyState == 4) {
-            if (this.status == 200) {
-                elmnt.innerHTML = this.responseText;
-            }
-            if (this.status == 404) {elmnt.innerHTML = "Page not found.";}
-            elmnt.removeAttribute("w3-include-html");
+const refreshDevices = (id, callback) => {
+    xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            const options = JSON.parse(this.responseText)
+            options.forEach(el => {
+                var option = document.createElement("option")
+                option.setAttribute("value", el.id)
+                option.textContent = el.label
+                document.getElementById(id+'-select').append(option);
+            })
             callback()
-          }
-        } 
-        xhttp.open("GET", "./"+file, true);
-        xhttp.send();
-        return;
-      }
+        }
     }
+    xhttp.open("GET", "./"+id, true);
+    xhttp.send();
+    return;
 }
 
 Chart.controllers.LineAlt = Chart.controllers.line.extend({
@@ -180,7 +173,7 @@ if (forecast == undefined) {
     forecast = 24
     localStorage.setItem('forecast', forecast)
 }
-includeInnerHtml('devices', ()=> {
+refreshDevices('devices', ()=> {
     document.getElementById('devices-select').value = device
 })
 document.getElementById('period-select').value = depth
