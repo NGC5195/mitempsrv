@@ -90,8 +90,8 @@ const getData = () => {
             asynchset('58:2d:34:3a:d2:7e', 'humColor', 'blue').then()
             asynchset('58:2d:34:3a:d2:7e', 'label', 'RDC').then()
 
-            asynchset('58:2d:34:3a:d2:37', 'tempColor', 'rgb(102, 153, 0)').then()
-            asynchset('58:2d:34:3a:d2:37', 'humColor', 'rgb(0, 51, 153)').then()
+            asynchset('58:2d:34:3a:d2:37', 'tempColor', 'rgb(204, 204, 0)').then()
+            asynchset('58:2d:34:3a:d2:37', 'humColor', 'rgb(153, 0, 153)').then()
             asynchset('58:2d:34:3a:d2:37', 'label', 'Extérieur').then()
 
             var today = new Date()
