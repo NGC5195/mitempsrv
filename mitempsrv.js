@@ -149,17 +149,17 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
 var express = require('express')
 var app = express()
 var favicon = require('serve-favicon')
-var session = require('express-session')({
-  secret: "albAtr-0s",
-  resave: true,
-  saveUninitialized: true
-})
+// var session = require('express-session')({
+//   secret: "albAtr-0s",
+//   resave: true,
+//   saveUninitialized: true
+// })
 app.set('port', process.env.PORT || 3000)
 app.use('/rasp', express.static(__dirname + '/css/'))
 app.use('/rasp', express.static(__dirname + '/dist/'))
 app.use('/rasp', express.static(__dirname + '/.'))
 app.use('/rasp', favicon(__dirname + '/icon.png'))
-app.use(session)
+// app.use(session)
 
 app.get('/rasp/data', (req, res) => {
   loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
@@ -177,6 +177,15 @@ app.get('/rasp/summary', (req, res) => {
 })
 
 app.get('/rasp/devices', (req, res) => {
+  deviceInfo().then((dvlist) => {
+    const devices = dvlist.map((dv) => {
+      return {id: dv.id, label: dv.label}
+    })
+    sendJsonString(JSON.stringify(devices), req, res)
+  })
+})
+
+app.get('/Rasp/Devices', (req, res) => {
   deviceInfo().then((dvlist) => {
     const devices = dvlist.map((dv) => {
       return {id: dv.id, label: dv.label}
