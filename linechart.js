@@ -162,29 +162,33 @@ const refresh = () => {
 window.screen.orientation.addEventListener('change', function() {
     refresh()
 });
+{
 
-var depth = localStorage.getItem('depth')
-var device = localStorage.getItem('device')
-var forecast = localStorage.getItem('forecast')
-if (depth == undefined) {
-    depth = 24
-    localStorage.setItem('depth', depth)
+    var depth = localStorage.getItem('depth')
+    var device = localStorage.getItem('device')
+    var forecast = localStorage.getItem('forecast')
+    if (depth == undefined) {
+        depth = 24
+        localStorage.setItem('depth', depth)
+    }
+    if (device == undefined) {
+        device = 'All'
+        localStorage.setItem('device', device)
+    }
+    if (forecast == undefined) {
+        forecast = 24
+        localStorage.setItem('forecast', forecast)
+    }
+    refreshDevices('devices', ()=> {
+        document.getElementById('devices-select').value = device
+    })
+    document.getElementById('period-select').value = depth
+    document.getElementById('forecast-select').value = forecast
+    
+    loadData(depth, forecast, device)
+    refresh()
+    
+    
+    
 }
-if (device == undefined) {
-    device = 'All'
-    localStorage.setItem('device', device)
-}
-if (forecast == undefined) {
-    forecast = 24
-    localStorage.setItem('forecast', forecast)
-}
-refreshDevices('devices', ()=> {
-    document.getElementById('devices-select').value = device
-})
-document.getElementById('period-select').value = depth
-document.getElementById('forecast-select').value = forecast
-
-loadData(depth, forecast, device)
-refresh()
-
 
