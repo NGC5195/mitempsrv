@@ -41,7 +41,7 @@ const refreshDevices = (id, callback) => {
         if (this.readyState == 4 && this.status == 200) {
             const options = JSON.parse(this.responseText)
             // options.push({id: 'All', label: 'Tous'})
-            const allOptions = [{id: 'All', label: 'Tous'}, options]
+            const allOptions = [{id: 'All', label: 'Tous'}, ...options]
             allOptions.forEach(el => {
                 var option = document.createElement("option")
                 option.setAttribute("value", el.id)
