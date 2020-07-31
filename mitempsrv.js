@@ -185,16 +185,6 @@ app.get('/rasp/devices', (req, res) => {
   })
 })
 
-app.get('/Rasp/Devices', (req, res) => {
-  deviceInfo().then((dvlist) => {
-    const devices = dvlist.map((dv) => {
-      return {id: dv.id, label: dv.label}
-    })
-    sendJsonString(JSON.stringify(devices), req, res)
-  })
-})
-
-
 app.use((req, res) => {
   res.type('text/plain')
   res.sendStatus('404')

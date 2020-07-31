@@ -37,8 +37,11 @@ const selectdevices = (o) => {
 
 const refreshDevices = (id, callback) => {
     xhttp = new XMLHttpRequest()
+    document.getElementById('comment').innerHTML = 'test'
     xhttp.onreadystatechange = function() {
+        document.getElementById('comment').innerHTML = 'onreadystatechange'
         if (this.readyState == 4 && this.status == 200) {
+            document.getElementById('comment').innerHTML = 'onreadystatechange 4 and 200'
             const options = JSON.parse(this.responseText)
             options.push({id: 'All', label: 'Tous'})
             options.forEach(el => {
