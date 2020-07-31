@@ -158,7 +158,7 @@ const refresh = () => {
     } else if (screen.orientation.type === 'portrait-primary') {
         document.getElementById('myChart').style.display='none'
         document.getElementById('summary').style.display='block'
-    }
+    } 
 }
 
 window.screen.orientation.addEventListener('change', function() {

@@ -18,7 +18,7 @@ const getData = () => {
     
     const suresne = '48.8687162,2.2044489'
     const ajou = '48.9891224,0.7801129'
-    request(`http://www.infoclimat.fr/public-api/gfs/json?_ll=${suresne}&_auth=VU8DFFMtVXdTflZhUyVQeQVtATRZLwEmUy8GZQ1oUi9TOQBjAGtWNVQ6WyYEKws%2FUn8AZwg%2FAzoBYFUzXy0Df1U1A2dTM1U%2FUz9WNlNhUHsFKQF8WWcBJlMvBmkNZFIvUzIAZABkVipUOVs4BDcLIVJgAGgIPgMkAX1VM183A2hVMQNjUzBVNlM1VjxTZFB7BSkBZFkzATBTZAY1DWVSMVMzAGcAa1YzVDxbOQQ9CyFSYABpCDcDOQFlVTNfMQNhVSkDeFNJVURTIVZ0UyFQMQVwAXxZMwFnU2Q%3D&_c=7a9fd6c8622720cb15b71b1c00dcb792`,
+    request(`http://www.infoclimat.fr/public-api/gfs/json?_ll=${ajou}&_auth=VU8DFFMtVXdTflZhUyVQeQVtATRZLwEmUy8GZQ1oUi9TOQBjAGtWNVQ6WyYEKws%2FUn8AZwg%2FAzoBYFUzXy0Df1U1A2dTM1U%2FUz9WNlNhUHsFKQF8WWcBJlMvBmkNZFIvUzIAZABkVipUOVs4BDcLIVJgAGgIPgMkAX1VM183A2hVMQNjUzBVNlM1VjxTZFB7BSkBZFkzATBTZAY1DWVSMVMzAGcAa1YzVDxbOQQ9CyFSYABpCDcDOQFlVTNfMQNhVSkDeFNJVURTIVZ0UyFQMQVwAXxZMwFnU2Q%3D&_c=7a9fd6c8622720cb15b71b1c00dcb792`,
         {
             json: true
         },
@@ -84,8 +84,18 @@ const getData = () => {
             asynchset(device, 'label', 'Prévision Ajou').then()
             asynchset('58:2d:34:39:77:eb', 'tempColor', 'green').then()
             asynchset('58:2d:34:39:77:eb', 'humColor', 'blue').then()
-            asynchset('58:2d:34:39:77:eb', 'label', 'Thermo 1').then()
-            console.log('done.')
+            asynchset('58:2d:34:39:77:eb', 'label', 'Etage').then()
+
+            asynchset('58:2d:34:3a:d2:7e', 'tempColor', 'green').then()
+            asynchset('58:2d:34:3a:d2:7e', 'humColor', 'blue').then()
+            asynchset('58:2d:34:3a:d2:7e', 'label', 'RDC').then()
+
+            asynchset('58:2d:34:3a:d2:37', 'tempColor', 'rgb(102, 153, 0)').then()
+            asynchset('58:2d:34:3a:d2:37', 'humColor', 'rgb(0, 51, 153)').then()
+            asynchset('58:2d:34:3a:d2:37', 'label', 'Extérieur').then()
+
+            var today = new Date()
+            console.log('done - '+today.toLocaleString())
             process.exit(0);
         })
 }
