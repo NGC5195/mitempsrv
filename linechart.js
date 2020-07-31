@@ -40,6 +40,7 @@ const refreshDevices = (id, callback) => {
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
             const options = JSON.parse(this.responseText)
+            options.push({id: 'All', label: 'Tous'})
             options.forEach(el => {
                 var option = document.createElement("option")
                 option.setAttribute("value", el.id)
