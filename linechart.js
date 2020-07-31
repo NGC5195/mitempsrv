@@ -147,10 +147,10 @@ const loadData = (depth, forecast, device) => {
 }
 
 const refresh = () => {
-    if (screen.orientation.type === 'landscape-primary') {
+    if (screen.orientation && screen.orientation.type === 'landscape-primary') {
         document.getElementById('myChart').style.display='block'
         document.getElementById('summary').style.display='none'
-    } else if (screen.orientation.type === 'portrait-primary') {
+    } else if (screen.orientation && screen.orientation.type === 'portrait-primary') {
         document.getElementById('myChart').style.display='none'
         document.getElementById('summary').style.display='block'
     } 
