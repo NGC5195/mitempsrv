@@ -159,9 +159,9 @@ const refresh = () => {
     } 
 }
 
-window.screen.orientation.addEventListener('change', function() {
-    refresh()
-});
+// window.screen.orientation.addEventListener('change', function() {
+//     refresh()
+// });
 var depth = localStorage.getItem('depth')
 var device = localStorage.getItem('device')
 var forecast = localStorage.getItem('forecast')
