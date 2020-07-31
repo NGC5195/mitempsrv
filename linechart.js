@@ -36,8 +36,7 @@ const selectdevices = (o) => {
 }
 
 const refreshDevices = (id, callback) => {
-    xhttp = new XMLHttpRequest();
-    xhttp.setRequestHeader("Cache-Control", "no-cache");
+    xhttp = new XMLHttpRequest()
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
             const options = JSON.parse(this.responseText)
@@ -52,6 +51,7 @@ const refreshDevices = (id, callback) => {
         }
     }
     xhttp.open("GET", "./"+id, true);
+    xhttp.setRequestHeader("Cache-Control", "no-cache")
     xhttp.send();
     return;
 }
