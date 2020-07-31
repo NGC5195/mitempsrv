@@ -179,16 +179,9 @@ app.get('/rasp/summary', (req, res) => {
 app.get('/rasp/devices', (req, res) => {
   deviceInfo().then((dvlist) => {
     const devices = dvlist.map((dv) => {
-      return `           <option value="${dv.id}">${dv.label}</option>\n`
+      return {id: dv.id, label: dv.label}
     })
-    res.type('text/html')
-    var innerHTML = '\
-          <label for="devices-select">Thermomète: </label>\n\
-          <select name="devices" id="devices-select" onchange="selectdevices(this)">\n\
-             <option value="All">Tous</option>\n`'
-    innerHTML += devices.reduce((x, y) => x + y)
-    innerHTML += '        </select>'
-    res.send(innerHTML)
+    sendJsonString(JSON.stringify(devices), req, res)
   })
 })
 
@@ -203,7 +196,7 @@ const server = require("http").createServer(app);
 // http listener
 server.listen(app.get('port'), function (req, res) {
   console.log('----- ' + new Date)
-  console.log('Server started on [http://127.0.0.1:' + app.get('port') + '/meteo.html] - Press Ctrl+C to terminate.')
+  console.log('Server started on [http://127.0.0.1:' + app.get('port') + '/rasp/meteo.html] - Press Ctrl+C to terminate.')
   showMemoryUsage()
 })
 
