@@ -137,7 +137,8 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
         datasets: alldata.reduce((acc, curr) => curr.concat(acc)),
         borderWidth: 1
       },
-      summary: getMinMax(alldata, depth)
+      summary: getMinMax(alldata, depth),
+      timestamp: tempDateTimeFiltered
     }
     callback(message)
   })
