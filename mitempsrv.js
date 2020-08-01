@@ -138,7 +138,7 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
         borderWidth: 1
       },
       summary: getMinMax(alldata, depth),
-      timestamp: tempDateTimeFiltered
+      timestamp: depth
     }
     callback(message)
   })
