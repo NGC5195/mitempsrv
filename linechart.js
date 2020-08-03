@@ -141,7 +141,7 @@ const loadData = (depth, forecast, device) => {
             myChart.update()
             myTable.setData(jsondata.summary)
             myTable.refresh
-            document.getElementById('timestamp').innerHTML = 'Dernière mesure à: '+jsondata.timestamp            
+            document.getElementById('timestamp').innerHTML = 'Dernière mesure à '+jsondata.timestamp            
         }
     }
     xhr.send(null)
