@@ -36,7 +36,8 @@ const smembers = async (key) => {
 const gettemphum = async (key) => {
   const temp = await redisClient.hget(key, 'temp')
   const hum = await redisClient.hget(key, 'hum')
-  return { temp, hum }
+  const rain = await redisClient.hget(key, 'hum')
+  return { temp, hum, rain }
 }
 
 const deviceInfo = async () => {
@@ -128,6 +129,14 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
         borderColor: humColor,
         data: data.map(o => o.hum),
         yAxisID: 'left-y-axis'
+      },
+      {
+        label: 'Rain: ' + label,
+        fill: false,
+        borderColor: 'Blue',
+        data: data.map(o => o.rain),
+        // yAxisID: 'left-y-axis',
+        type: "bar"
       }]
     })
   })).then((alldata) => {
