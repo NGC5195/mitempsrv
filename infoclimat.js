@@ -37,7 +37,8 @@ const getData = () => {
                                 day: key.substr(8, 2),
                                 hour: key.substr(11, 2),
                                 temp: precise(obj.temperature['2m'] - 273.15),
-                                hum: precise(obj.humidite['2m'])
+                                hum: precise(obj.humidite['2m']),
+                                rain: precise(obj.pluie / 3)
                             }
                         )
                     }
@@ -54,7 +55,8 @@ const getData = () => {
                                 day: curr.day,
                                 hour: pad02(curr.hour-2),
                                 temp: precise(array[idx-1].temp + ((array[idx].temp - array[idx-1].temp)/3)),
-                                hum: precise(array[idx-1].hum + ((array[idx].hum - array[idx-1].hum)/3))
+                                hum: precise(array[idx-1].hum + ((array[idx].hum - array[idx-1].hum)/3)),
+                                rain: precise(array[idx].rain),
                             }
                         )
                         arr2.push(
@@ -64,7 +66,8 @@ const getData = () => {
                                 day: curr.day,
                                 hour: pad02(curr.hour-1),
                                 temp: precise(array[idx-1].temp + ((array[idx].temp - array[idx-1].temp)/3*2)),
-                                hum: precise(array[idx-1].hum + ((array[idx].hum - array[idx-1].hum)/3*2))
+                                hum: precise(array[idx-1].hum + ((array[idx].hum - array[idx-1].hum)/3*2)),
+                                rain: precise(array[idx].rain),
                             }
                         )
                         arr2.push(curr)
@@ -77,6 +80,7 @@ const getData = () => {
                     asyncsadd("datetime", datetime).then()
                     asynchset(datetime+'-'+device, 'temp', x.temp).then()
                     asynchset(datetime+'-'+device, 'hum', x.hum).then()
+                    asynchset(datetime+'-'+device, 'rain', x.rain).then()
                 })
             }
             asynchset(device, 'tempColor', 'rgb(221, 255, 153)').then()
