@@ -133,7 +133,7 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
       if (dv == 'infoclimat1') {
         dateforChar.push(
           {
-            label: 'Rain: ' + label,
+            label: 'Pluie: ' + label,
             fill: false,
             // borderColor: 'Blue',
             data: data.map(o => o.rain),
