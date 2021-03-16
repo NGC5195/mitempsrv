@@ -68,7 +68,7 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
 
   const getMinMax = (data, currIdx) => {
     return data.reduce((acc, curr) => curr.concat(acc)).map((x) => {
-      var label = x.label.replace(/Temp:/gi, '&#127777;').replace(/Hum:/gi, '&#x1F327;')
+      var label = x.label.replace(/Temp:/gi, '&#127777;').replace(/Pluie:/gi, '&#x1F327;').replace(/Hum:/gi, '&#x1F4A7;')
       return {
         label: label,
         min: Math.min.apply(Math, x.data.filter((x)=>x)),
