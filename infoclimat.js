@@ -53,7 +53,7 @@ const getData = () => {
                                 year: curr.year,
                                 month: curr.month,
                                 day: curr.hour-2<0?curr.day-1:curr.day,
-                                hour: curr.hour-2<0?pad02(curr.hour+24-2):pad02(curr.hour-2),
+                                hour: curr.hour-2<0?23:pad02(curr.hour-2),
                                 temp: precise(array[idx-1].temp + ((array[idx].temp - array[idx-1].temp)/3)),
                                 hum: precise(array[idx-1].hum + ((array[idx].hum - array[idx-1].hum)/3)),
                                 rain: precise(array[idx].rain),
