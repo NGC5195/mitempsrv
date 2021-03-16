@@ -116,7 +116,7 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
       const tempColor = await redisClient.hget(dv, 'tempColor')
       const humColor = await redisClient.hget(dv, 'humColor')
       const label = await redisClient.hget(dv, 'label')
-      return [{
+      let dateforChar = [{
         label: 'Temp: ' + label,
         fill: false,
         borderColor: tempColor,
@@ -129,15 +129,20 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
         borderColor: humColor,
         data: data.map(o => o.hum),
         yAxisID: 'left-y-axis'
-      },
-      {
-        label: 'Rain: ' + label,
-        fill: false,
-        // borderColor: 'Blue',
-        data: data.map(o => o.rain),
-        yAxisID: 'right-y-axis',
-        type: "bar"
-      }]
+      }];
+      if (dv == 'infoclimat1') {
+        dateforChar.push(
+          {
+            label: 'Rain: ' + label,
+            fill: false,
+            // borderColor: 'Blue',
+            data: data.map(o => o.rain),
+            yAxisID: 'right-y-axis',
+            type: "bar"
+          }          
+        )
+      }
+      return dateforChar;
     })
   })).then((alldata) => {
     const message = {
