@@ -133,10 +133,10 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
       {
         label: 'Rain: ' + label,
         fill: false,
-        borderColor: 'Blue',
+        // borderColor: 'Blue',
         data: data.map(o => o.rain),
         // yAxisID: 'left-y-axis',
-        type: "bar"
+        // type: "bar"
       }]
     })
   })).then((alldata) => {
