@@ -183,5 +183,5 @@ refreshDevices('devices', ()=> {
 document.getElementById('period-select').value = depth
 document.getElementById('forecast-select').value = forecast
 
-//loadData(depth, forecast, device)
+loadData(depth, forecast, device)
 refresh()
