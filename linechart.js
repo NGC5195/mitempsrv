@@ -1,3 +1,5 @@
+import {Spinner} from 'spin.js';
+
 const ctx = document.getElementById('myChart').getContext('2d')
 const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Noc', 'Déc']
 
