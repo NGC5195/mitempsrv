@@ -180,8 +180,10 @@ if (forecast == undefined) {
 refreshDevices('devices', ()=> {
     document.getElementById('devices-select').value = device
 })
+var spinner = new Spinner().spin();
 document.getElementById('period-select').value = depth
 document.getElementById('forecast-select').value = forecast
-
+document.getElementById('spinner').appendChild(spinner.el);
 loadData(depth, forecast, device)
+spinner.stop()
 refresh()
