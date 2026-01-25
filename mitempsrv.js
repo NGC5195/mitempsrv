@@ -34,11 +34,78 @@ const smembers = async (key) => {
   return values
 }
 
-const gettemphum = async (key) => {
-  const temp = await redisClient.hget(key, 'temp')
-  const hum = await redisClient.hget(key, 'hum')
-  const rain = await redisClient.hget(key, 'rain')
-  return { temp, hum, rain }
+// Convert datetime string "MM/DD/YYYY-HH" to Unix timestamp
+const dateTimeToTimestamp = (dtStr) => {
+  const [datePart, hour] = dtStr.split('-')
+  const [month, day, year] = datePart.split('/')
+  return new Date(year, month - 1, day, parseInt(hour)).getTime()
+}
+
+// Convert Unix timestamp back to datetime string "MM/DD/YYYY-HH"
+const timestampToDateTime = (ts) => {
+  const d = new Date(ts)
+  return `${pad02(d.getMonth() + 1)}/${pad02(d.getDate())}/${d.getFullYear()}-${pad02(d.getHours())}`
+}
+
+// Get datetime keys for a specific time range (last N hours + forecast hours)
+const getDateTimeRange = (depthHours, forecastHours) => {
+  const now = new Date()
+  now.setMinutes(0, 0, 0) // Round to current hour
+  
+  const result = []
+  const startHour = -depthHours
+  const endHour = forecastHours
+  
+  for (let h = startHour; h <= endHour; h++) {
+    const d = new Date(now.getTime() + h * 3600000)
+    result.push(`${pad02(d.getMonth() + 1)}/${pad02(d.getDate())}/${d.getFullYear()}-${pad02(d.getHours())}`)
+  }
+  return result
+}
+
+// Batch fetch all temp/hum/rain data using pipeline (single Redis roundtrip)
+const batchGetTempHum = async (keys) => {
+  if (keys.length === 0) return []
+  
+  // Use pipeline to batch all HGETALL commands
+  const pipeline = redisClient.batch()
+  keys.forEach(key => pipeline.hgetall(key))
+  
+  return new Promise((resolve, reject) => {
+    pipeline.exec((err, results) => {
+      if (err) reject(err)
+      else resolve(results.map(r => r || { temp: null, hum: null, rain: null }))
+    })
+  })
+}
+
+// Cache device info (colors, labels) - they rarely change
+let deviceInfoCache = null
+let deviceInfoCacheTime = 0
+const DEVICE_CACHE_TTL = 60000 // 1 minute
+
+const getCachedDeviceInfo = async (deviceId) => {
+  const now = Date.now()
+  if (!deviceInfoCache || now - deviceInfoCacheTime > DEVICE_CACHE_TTL) {
+    const devices = await redisClient.smembers('devices')
+    const pipeline = redisClient.batch()
+    devices.forEach(dv => pipeline.hgetall(dv))
+    
+    deviceInfoCache = await new Promise((resolve, reject) => {
+      pipeline.exec((err, results) => {
+        if (err) reject(err)
+        else {
+          const cache = {}
+          devices.forEach((dv, i) => {
+            cache[dv] = results[i] || {}
+          })
+          resolve(cache)
+        }
+      })
+    })
+    deviceInfoCacheTime = now
+  }
+  return deviceInfoCache[deviceId] || {}
 }
 
 const deviceInfo = async () => {
@@ -57,15 +124,12 @@ const formatDateTime = (str) => {
 
 const loadDataFromRedis = async (depth, forecast, device, callback) => {
   const tempDevices = await smembers("devices")
-  const tempDateTime = await smembers("datetime")
+  
+  // Filter devices
+  const filteredDevices = tempDevices.filter((x) => device === 'All' || device == x)
 
-  const filteredDevices = tempDevices.filter((x) => {
-    if (device === 'All' || device == x) {
-      return 1
-    } else {
-      return 0
-    }
-  })
+  // Generate only the datetime range we need (no more loading entire history!)
+  const tempDateTimeFiltered = getDateTimeRange(depth, forecast)
 
   const getMinMax = (data, currIdx) => {
     return data.reduce((acc, curr) => curr.concat(acc)).map((x) => {
@@ -79,84 +143,74 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
     })
   }
 
-  var tempDateTimeSorted = tempDateTime.sort((a, b) => {
-    const atime = a.split('-');
-    const adate = atime[0].split('/');
-    const aa = adate[2] + adate[0] + adate[1] + atime[1]
-    const btime = b.split('-');
-    const bdate = btime[0].split('/');
-    const bb = bdate[2] + bdate[0] + bdate[1] + btime[1]
-    return aa.localeCompare(bb);;
-  });
-
-  const d = new Date();
-  const current = `${pad02(d.getMonth()+1)}/${pad02(d.getDate())}/${d.getFullYear()}-${pad02(d.getHours())}`
-  const currentIndex = tempDateTimeSorted.findIndex(element => element == current);
-
-  if (currentIndex+forecast > tempDateTimeSorted.length) {
-    forecast = tempDateTimeSorted.length - currentIndex
-  }
-  
-  if (currentIndex-depth < 0) {
-    depth = currentIndex
-  }
-
-  var tempDateTimeFiltered = []
-  for (let i = 0; i < tempDateTimeSorted.length; i++) {
-    if ((i >= currentIndex-depth) && (i <= currentIndex+forecast)) {
-      tempDateTimeFiltered.push(tempDateTimeSorted[i])
-    }
-  }
-
-  Promise.all(filteredDevices.map((dv) => {
-    return Promise.all(tempDateTimeFiltered.map((dt) => {
-      return gettemphum(dt + '-' + dv).then((val) => {
-        return val
-      });
-    })).then(async (data) => {
-      const tempColor = await redisClient.hget(dv, 'tempColor')
-      const humColor = await redisClient.hget(dv, 'humColor')
-      const label = await redisClient.hget(dv, 'label')
-      let dateforChar = [{
-        label: 'Temp: ' + label,
-        fill: false,
-        borderColor: tempColor,
-        data: data.map(o => o.temp),
-        yAxisID: 'right-y-axis'
-      },
-      {
-        label: 'Hum: ' + label,
-        fill: false,
-        borderColor: humColor,
-        data: data.map(o => o.hum),
-        yAxisID: 'left-y-axis'
-      }];
-      if (dv == 'infoclimat1') {
-        dateforChar.push(
-          {
-            label: 'Pluie: ' + label,
-            fill: false,
-            // borderColor: 'Blue',
-            data: data.map(o => o.rain),
-            yAxisID: 'right-y-axis',
-            type: "bar"
-          }          
-        )
-      }
-      return dateforChar;
+  // Build all keys we need to fetch (datetime-device combinations)
+  const allKeys = []
+  const keyMap = [] // Track which key belongs to which device
+  filteredDevices.forEach(dv => {
+    tempDateTimeFiltered.forEach(dt => {
+      allKeys.push(`${dt}-${dv}`)
+      keyMap.push({ device: dv, datetime: dt })
     })
-  })).then((alldata) => {
-    const message = {
-      chartdata: {
-        labels: tempDateTimeFiltered.map(x => formatDateTime(x)),
-        datasets: alldata.reduce((acc, curr) => curr.concat(acc)),
-        borderWidth: 1
-      },
-      summary: getMinMax(alldata, depth),
-      timestamp: tempDateTimeFiltered.map(x => formatDateTime(x))[depth]
-    }
-    callback(message)
   })
+
+  // Single batch fetch for ALL data points (1 Redis roundtrip instead of 1500+)
+  const allData = await batchGetTempHum(allKeys)
+
+  // Organize data by device
+  const dataByDevice = {}
+  filteredDevices.forEach(dv => { dataByDevice[dv] = [] })
+  
+  allData.forEach((data, i) => {
+    const { device } = keyMap[i]
+    dataByDevice[device].push({
+      temp: data.temp,
+      hum: data.hum,
+      rain: data.rain
+    })
+  })
+
+  // Build chart datasets (device info is cached)
+  const allDatasets = await Promise.all(filteredDevices.map(async (dv) => {
+    const deviceInfo = await getCachedDeviceInfo(dv)
+    const data = dataByDevice[dv]
+    
+    let dateforChar = [{
+      label: 'Temp: ' + deviceInfo.label,
+      fill: false,
+      borderColor: deviceInfo.tempColor,
+      data: data.map(o => o.temp),
+      yAxisID: 'right-y-axis'
+    },
+    {
+      label: 'Hum: ' + deviceInfo.label,
+      fill: false,
+      borderColor: deviceInfo.humColor,
+      data: data.map(o => o.hum),
+      yAxisID: 'left-y-axis'
+    }]
+    
+    if (dv == 'infoclimat1') {
+      dateforChar.push({
+        label: 'Pluie: ' + deviceInfo.label,
+        fill: false,
+        data: data.map(o => o.rain),
+        yAxisID: 'right-y-axis',
+        type: "bar"
+      })
+    }
+    return dateforChar
+  }))
+
+  const message = {
+    chartdata: {
+      labels: tempDateTimeFiltered.map(x => formatDateTime(x)),
+      datasets: allDatasets.reduce((acc, curr) => curr.concat(acc)),
+      borderWidth: 1
+    },
+    summary: getMinMax(allDatasets, depth),
+    timestamp: tempDateTimeFiltered.map(x => formatDateTime(x))[depth]
+  }
+  callback(message)
 }
 
 //----------------------------------------------------------------------------------------
