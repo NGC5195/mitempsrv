@@ -1,6 +1,66 @@
 const ctx = document.getElementById('myChart').getContext('2d')
 const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Noc', 'Déc']
 
+// Plugin to draw gray background for nighttime hours (21h-06h)
+const nightTimePlugin = {
+    id: 'nightTimeBackground',
+    beforeDraw: function(chart) {
+        const ctx = chart.ctx
+        const chartArea = chart.chartArea
+        const xAxis = chart.scales['x-axis-0']
+        const labels = chart.data.labels || []
+        
+        if (!chartArea || !xAxis || labels.length === 0) return
+        
+        ctx.save()
+        ctx.fillStyle = 'rgba(100, 100, 100, 0.15)' // Light gray with transparency
+        
+        // Find night hour ranges and draw rectangles
+        let nightStart = null
+        
+        labels.forEach((label, index) => {
+            // Extract hour from label (format: "DD/MM/YYYY HHh")
+            const hourMatch = label.match(/(\d{2})h$/)
+            if (!hourMatch) return
+            
+            const hour = parseInt(hourMatch[1])
+            const isNight = hour >= 21 || hour < 6 // 21h to 06h
+            
+            if (isNight && nightStart === null) {
+                nightStart = index
+            } else if (!isNight && nightStart !== null) {
+                // Draw rectangle for the night period that just ended
+                drawNightRect(ctx, xAxis, chartArea, nightStart, index - 1, labels.length)
+                nightStart = null
+            }
+        })
+        
+        // Handle case where night period extends to the end
+        if (nightStart !== null) {
+            drawNightRect(ctx, xAxis, chartArea, nightStart, labels.length - 1, labels.length)
+        }
+        
+        ctx.restore()
+    }
+}
+
+function drawNightRect(ctx, xAxis, chartArea, startIdx, endIdx, totalLabels) {
+    // Calculate pixel positions for the rectangle
+    const xStart = xAxis.getPixelForValue(null, startIdx)
+    const xEnd = xAxis.getPixelForValue(null, endIdx)
+    
+    // Calculate width per label to extend rectangle properly
+    const labelWidth = (xAxis.right - xAxis.left) / (totalLabels - 1 || 1)
+    
+    const x = startIdx === 0 ? chartArea.left : xStart - labelWidth / 2
+    const width = (endIdx - startIdx + 1) * labelWidth
+    
+    ctx.fillRect(x, chartArea.top, width, chartArea.bottom - chartArea.top)
+}
+
+// Register the plugin
+Chart.pluginService.register(nightTimePlugin)
+
 const formatDateTime = (str) => {
     const time = str.split(' ')
     const date = time[0].split('/')
