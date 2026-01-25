@@ -48,41 +48,85 @@ const timestampToDateTime = (ts) => {
 }
 
 // Get datetime keys for a specific time range (last N hours + forecast hours)
+// Uses sampling for long periods to reduce data points
 const getDateTimeRange = (depthHours, forecastHours) => {
   const now = new Date()
   now.setMinutes(0, 0, 0) // Round to current hour
   
-  const result = []
-  const startHour = -depthHours
-  const endHour = forecastHours
+  const totalHours = depthHours + forecastHours
   
-  for (let h = startHour; h <= endHour; h++) {
+  // Sampling: reduce data points for long periods
+  // <= 72h: every hour (max 72 points)
+  // <= 168h (week): every 2 hours (max 84 points)  
+  // > 168h (month): every 4 hours (max 168 points)
+  let step = 1
+  if (totalHours > 168) step = 4
+  else if (totalHours > 72) step = 2
+  
+  const result = []
+  for (let h = -depthHours; h <= forecastHours; h += step) {
     const d = new Date(now.getTime() + h * 3600000)
     result.push(`${pad02(d.getMonth() + 1)}/${pad02(d.getDate())}/${d.getFullYear()}-${pad02(d.getHours())}`)
   }
   return result
 }
 
-// Batch fetch all temp/hum/rain data using pipeline (single Redis roundtrip)
+// Batch fetch data in chunks to avoid overwhelming Pi Zero
+const CHUNK_SIZE = 50 // Process 50 keys at a time
+
 const batchGetTempHum = async (keys) => {
   if (keys.length === 0) return []
   
-  // Use pipeline to batch all HGETALL commands
-  const pipeline = redisClient.batch()
-  keys.forEach(key => pipeline.hgetall(key))
+  const results = []
   
-  return new Promise((resolve, reject) => {
-    pipeline.exec((err, results) => {
-      if (err) reject(err)
-      else resolve(results.map(r => r || { temp: null, hum: null, rain: null }))
+  // Process in chunks to avoid memory/CPU issues on Pi Zero
+  for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+    const chunk = keys.slice(i, i + CHUNK_SIZE)
+    const pipeline = redisClient.batch()
+    chunk.forEach(key => pipeline.hgetall(key))
+    
+    const chunkResults = await new Promise((resolve, reject) => {
+      pipeline.exec((err, res) => {
+        if (err) reject(err)
+        else resolve(res)
+      })
     })
-  })
+    
+    results.push(...chunkResults.map(r => r || { temp: null, hum: null, rain: null }))
+  }
+  
+  return results
 }
 
 // Cache device info (colors, labels) - they rarely change
 let deviceInfoCache = null
 let deviceInfoCacheTime = 0
 const DEVICE_CACHE_TTL = 60000 // 1 minute
+
+// Response cache - cache full API responses for 5 minutes
+const responseCache = new Map()
+const RESPONSE_CACHE_TTL = 300000 // 5 minutes
+
+const getCacheKey = (depth, forecast, device) => `${depth}-${forecast}-${device}`
+
+const getCachedResponse = (depth, forecast, device) => {
+  const key = getCacheKey(depth, forecast, device)
+  const cached = responseCache.get(key)
+  if (cached && Date.now() - cached.time < RESPONSE_CACHE_TTL) {
+    return cached.data
+  }
+  return null
+}
+
+const setCachedResponse = (depth, forecast, device, data) => {
+  const key = getCacheKey(depth, forecast, device)
+  responseCache.set(key, { data, time: Date.now() })
+  // Clean old entries (keep max 20)
+  if (responseCache.size > 20) {
+    const oldest = responseCache.keys().next().value
+    responseCache.delete(oldest)
+  }
+}
 
 const getCachedDeviceInfo = async (deviceId) => {
   const now = Date.now()
@@ -123,13 +167,24 @@ const formatDateTime = (str) => {
 }
 
 const loadDataFromRedis = async (depth, forecast, device, callback) => {
+  // Check response cache first (instant response for repeated queries)
+  const cached = getCachedResponse(depth, forecast, device)
+  if (cached) {
+    console.log(`Cache hit for depth=${depth}, forecast=${forecast}, device=${device}`)
+    return callback(cached)
+  }
+  
+  console.log(`Cache miss - fetching from Redis: depth=${depth}, forecast=${forecast}, device=${device}`)
+  const startTime = Date.now()
+  
   const tempDevices = await smembers("devices")
   
   // Filter devices
   const filteredDevices = tempDevices.filter((x) => device === 'All' || device == x)
 
-  // Generate only the datetime range we need (no more loading entire history!)
+  // Generate only the datetime range we need (with sampling for long periods)
   const tempDateTimeFiltered = getDateTimeRange(depth, forecast)
+  console.log(`Fetching ${tempDateTimeFiltered.length} time points for ${filteredDevices.length} devices = ${tempDateTimeFiltered.length * filteredDevices.length} keys`)
 
   const getMinMax = (data, currIdx) => {
     return data.reduce((acc, curr) => curr.concat(acc)).map((x) => {
@@ -210,6 +265,11 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
     summary: getMinMax(allDatasets, depth),
     timestamp: tempDateTimeFiltered.map(x => formatDateTime(x))[depth]
   }
+  
+  // Cache the response for next time
+  setCachedResponse(depth, forecast, device, message)
+  console.log(`Redis fetch completed in ${Date.now() - startTime}ms`)
+  
   callback(message)
 }
 
