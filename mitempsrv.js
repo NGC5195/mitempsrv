@@ -15,10 +15,11 @@ const showMemoryUsage = () => console.log(' >used heap size:' + (v8.getHeapStati
 const pad02 = (x) => x.toFixed(0).padStart(2, '0')
 
 // Parse datetime string from Redis format "MM/DD/YYYY-HH" to timestamp (milliseconds)
+// Handles both padded (01/01/2026-08) and non-padded (1/1/2026-8) formats
 const parseDateTimeString = (dtStr) => {
   if (!dtStr) return null
-  // Format: "01/23/2026-18" -> MM/DD/YYYY-HH
-  const match = dtStr.match(/^(\d{2})\/(\d{2})\/(\d{4})-(\d{2})$/)
+  // Format: "01/23/2026-18" or "1/3/2026-8" -> M/D/YYYY-H
+  const match = dtStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})-(\d{1,2})$/)
   if (!match) {
     console.log(`[Parse] Invalid datetime format: ${dtStr}`)
     return null
