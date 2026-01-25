@@ -14,6 +14,26 @@ const showMemoryUsage = () => console.log(' >used heap size:' + (v8.getHeapStati
 
 const pad02 = (x) => x.toFixed(0).padStart(2, '0')
 
+// Parse datetime string from Redis format "MM/DD/YYYY-HH" to timestamp (milliseconds)
+const parseDateTimeString = (dtStr) => {
+  if (!dtStr) return null
+  // Format: "01/23/2026-18" -> MM/DD/YYYY-HH
+  const match = dtStr.match(/^(\d{2})\/(\d{2})\/(\d{4})-(\d{2})$/)
+  if (!match) {
+    console.log(`[Parse] Invalid datetime format: ${dtStr}`)
+    return null
+  }
+  const [, month, day, year, hour] = match
+  const ts = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour)).getTime()
+  return ts
+}
+
+// Format timestamp (milliseconds) to chart label "DD/MM/YYYY HHh"
+const formatTimestampForChart = (ts) => {
+  const d = new Date(ts)
+  return `${pad02(d.getDate())}/${pad02(d.getMonth() + 1)}/${d.getFullYear()} ${pad02(d.getHours())}h`
+}
+
 const IsJsonString = (str) => {
   try {
     JSON.parse(str)
@@ -169,35 +189,38 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
   Object.values(dataByDevice).forEach(dataPoints => {
     dataPoints.forEach(dp => {
       if (dp.datetime) {
-        // Parse datetime string to get timestamp for sorting
-        const ts = new Date(dp.datetime).getTime()
-        if (!isNaN(ts)) allTimestamps.add(ts)
+        // Parse datetime string "MM/DD/YYYY-HH" to timestamp
+        const ts = parseDateTimeString(dp.datetime)
+        if (ts !== null) allTimestamps.add(ts)
       }
     })
   })
   const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b)
+  console.log(`[loadData] Found ${sortedTimestamps.length} unique timestamps`)
 
   // Format timestamps for chart labels (DD/MM/YYYY HHh)
-  const formatTimestamp = (ts) => {
-    const d = new Date(ts)
-    return `${pad02(d.getDate())}/${pad02(d.getMonth() + 1)}/${d.getFullYear()} ${pad02(d.getHours())}h`
-  }
-  const chartLabels = sortedTimestamps.map(ts => formatTimestamp(ts))
+  const chartLabels = sortedTimestamps.map(ts => formatTimestampForChart(ts))
 
   // Find current index (closest to now) for "current" value display
   // Note: sortedTimestamps are in milliseconds, currentTs is in seconds
   const currentIdx = sortedTimestamps.findIndex(ts => ts >= currentTs * 1000)
   const currIdx = currentIdx >= 0 ? currentIdx : sortedTimestamps.length - 1
 
-  const getMinMax = (data, currIdx) => {
-    return data.reduce((acc, curr) => curr.concat(acc)).map((x) => {
-      var label = x.label.replace(/Temp:/gi, '&#127777;').replace(/Pluie:/gi, '&#x1F327;').replace(/Hum:/gi, '&#x1F4A7;')
-      const validData = x.data.filter(v => v !== null && v !== undefined)
+  // Calculate min/max/current for summary table
+  const getMinMax = (datasetsArray, currIdx) => {
+    // Flatten nested arrays: [[ds1, ds2], [ds3, ds4]] -> [ds1, ds2, ds3, ds4]
+    const flatDatasets = datasetsArray.reduce((acc, curr) => acc.concat(curr), [])
+    return flatDatasets.map((dataset) => {
+      const label = dataset.label
+        .replace(/Temp:/gi, '&#127777;')
+        .replace(/Pluie:/gi, '&#x1F327;')
+        .replace(/Hum:/gi, '&#x1F4A7;')
+      const validData = dataset.data.filter(v => v !== null && v !== undefined)
       return {
         label: label,
         min: validData.length > 0 ? Math.min(...validData) : null,
         max: validData.length > 0 ? Math.max(...validData) : null,
-        curr: x.data[currIdx]
+        curr: dataset.data[currIdx] !== undefined ? dataset.data[currIdx] : null
       }
     })
   }
@@ -211,10 +234,11 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
     const dataMap = new Map()
     rawData.forEach(dp => {
       if (dp.datetime) {
-        const ts = new Date(dp.datetime).getTime()
-        if (!isNaN(ts)) dataMap.set(ts, dp)
+        const ts = parseDateTimeString(dp.datetime)
+        if (ts !== null) dataMap.set(ts, dp)
       }
     })
+    console.log(`[loadData] Device ${dv}: ${dataMap.size} data points mapped`)
 
     // Align data to sorted timestamps (fill nulls for missing points)
     const alignedData = sortedTimestamps.map(ts => {
@@ -222,37 +246,42 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
       return dp || { temp: null, hum: null, batt: null }
     })
     
-    let dateforChar = [{
-      label: 'Temp: ' + deviceMeta.label,
+    // Build Chart.js dataset format
+    let datasets = [{
+      label: 'Temp: ' + (deviceMeta.label || dv),
       fill: false,
-      borderColor: deviceMeta.tempColor,
-      data: alignedData.map(o => o.temp !== null ? parseFloat(o.temp) : null),
+      borderColor: deviceMeta.tempColor || '#FF6384',
+      data: alignedData.map(o => o.temp !== null && o.temp !== undefined ? parseFloat(o.temp) : null),
       yAxisID: 'right-y-axis'
     },
     {
-      label: 'Hum: ' + deviceMeta.label,
+      label: 'Hum: ' + (deviceMeta.label || dv),
       fill: false,
-      borderColor: deviceMeta.humColor,
-      data: alignedData.map(o => o.hum !== null ? parseFloat(o.hum) : null),
+      borderColor: deviceMeta.humColor || '#36A2EB',
+      data: alignedData.map(o => o.hum !== null && o.hum !== undefined ? parseFloat(o.hum) : null),
       yAxisID: 'left-y-axis'
     }]
     
     if (dv == 'infoclimat1') {
-      dateforChar.push({
-        label: 'Pluie: ' + deviceMeta.label,
+      datasets.push({
+        label: 'Pluie: ' + (deviceMeta.label || dv),
         fill: false,
-        data: alignedData.map(o => o.rain !== null ? parseFloat(o.rain) : null),
+        borderColor: '#4BC0C0',
+        data: alignedData.map(o => o.rain !== null && o.rain !== undefined ? parseFloat(o.rain) : null),
         yAxisID: 'right-y-axis',
         type: "bar"
       })
     }
-    return dateforChar
+    return datasets
   }))
 
+  // Flatten datasets array (each device returns multiple datasets)
+  const flatDatasets = allDatasets.reduce((acc, curr) => acc.concat(curr), [])
+  
   const message = {
     chartdata: {
       labels: chartLabels,
-      datasets: allDatasets.reduce((acc, curr) => curr.concat(acc)),
+      datasets: flatDatasets,
       borderWidth: 1
     },
     summary: getMinMax(allDatasets, currIdx),
@@ -260,7 +289,9 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
   }
   
   const duration = Date.now() - startTime
-  console.log(`[loadData] Completed in ${duration}ms - ${chartLabels.length} data points, ${allDatasets.length} datasets`)
+  console.log(`[loadData] Completed in ${duration}ms - ${chartLabels.length} labels, ${flatDatasets.length} datasets`)
+  console.log(`[loadData] Sample labels: ${chartLabels.slice(0, 3).join(', ')}...`)
+  console.log(`[loadData] Datasets: ${flatDatasets.map(d => d.label).join(', ')}`)
   callback(message)
 }
 
