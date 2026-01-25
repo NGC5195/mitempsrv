@@ -1,5 +1,8 @@
 const ctx = document.getElementById('myChart').getContext('2d')
-const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Noc', 'Déc']
+const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+
+// Track current depth for x-axis formatting
+let currentDepth = 24
 
 // Plugin to draw gray background for nighttime hours (21h-06h)
 const nightTimePlugin = {
@@ -143,7 +146,21 @@ const myChart = new Chart(ctx, {
             }
         },
         tooltips: {
-            mode: 'nearest'
+            mode: 'nearest',
+            callbacks: {
+                label: function(tooltipItem, data) {
+                    const dataset = data.datasets[tooltipItem.datasetIndex]
+                    const value = dataset.data[tooltipItem.index]
+                    
+                    // Handle floating bar (candlestick) data [min, max]
+                    if (Array.isArray(value)) {
+                        return dataset.label + ': ' + value[0].toFixed(1) + ' - ' + value[1].toFixed(1)
+                    }
+                    
+                    // Normal single value
+                    return dataset.label + ': ' + (value !== null ? value : '-')
+                }
+            }
         },
         scales: {
             yAxes: [{
@@ -168,11 +185,34 @@ const myChart = new Chart(ctx, {
                 ticks: {
                     maxTicksLimit: 12,
                     callback: (value, index, values) => {
+                        // For yearly view (labels are already in DD-MMM format)
+                        if (currentDepth >= 8760) {
+                            // Show every 4th label for readability
+                            return index % 4 === 0 ? value : null
+                        }
+                        
                         const date = formatDateTime(value)
-                        if (date.hour == '00h') {
-                            return date.day+' '+monthLabel[parseInt(date.month)]
+                        if (!date.hour) return value // Fallback if format doesn't match
+                        
+                        // For longer periods (48h+), show date format "DD-MMM"
+                        if (currentDepth >= 48) {
+                            // Show date at midnight or at regular intervals
+                            if (date.hour == '00h' || index === 0) {
+                                return date.day + '-' + monthLabel[parseInt(date.month) - 1]
+                            } else if (currentDepth >= 168) {
+                                // For week/month, only show dates (skip hours entirely)
+                                return null
+                            } else {
+                                // For 48h-72h, show some hours at noon
+                                return date.hour == '12h' ? '12h' : null
+                            }
                         } else {
-                            return date.hour
+                            // For 24h, show hours with date at midnight
+                            if (date.hour == '00h') {
+                                return date.day + ' ' + monthLabel[parseInt(date.month) - 1]
+                            } else {
+                                return date.hour
+                            }
                         }
                     }
                 }            
@@ -191,9 +231,116 @@ const myTable = new Tabulator("#summary", {
     ],
 })
 
-const loadData = (depth, forecast, device) => {
+// Show/hide UI elements
+const showMessage = (msg) => {
+    document.getElementById('message').textContent = msg
+    document.getElementById('message').style.display = 'block'
+    document.getElementById('myChart').style.display = 'none'
+    document.getElementById('summary').style.display = 'none'
+}
+
+const hideMessage = () => {
+    document.getElementById('message').style.display = 'none'
+    document.getElementById('myChart').style.display = 'block'
+    document.getElementById('summary').style.display = 'block'
+}
+
+// Load yearly candlestick data
+const loadYearData = (device) => {
     var xhr = new XMLHttpRequest()
     Spinner.show()
+    
+    xhr.open("GET", `./yeardata?device=${device}`)
+    xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            const jsondata = JSON.parse(xhr.responseText)
+            
+            // Convert candlestick data to floating bar chart
+            // Each bar goes from min to max value
+            const tempBars = jsondata.tempData.map(d => d ? [d.min, d.max] : null)
+            const humBars = jsondata.humData.map(d => d ? [d.min, d.max] : null)
+            
+            myChart.data = {
+                labels: jsondata.labels,
+                datasets: [{
+                    label: 'Temp: ' + jsondata.deviceLabel + ' (min-max)',
+                    data: tempBars,
+                    backgroundColor: jsondata.tempColor || 'rgba(255, 99, 132, 0.7)',
+                    borderColor: jsondata.tempColor || 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'right-y-axis'
+                }, {
+                    label: 'Hum: ' + jsondata.deviceLabel + ' (min-max)',
+                    data: humBars,
+                    backgroundColor: jsondata.humColor || 'rgba(54, 162, 235, 0.7)',
+                    borderColor: jsondata.humColor || 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'left-y-axis'
+                }]
+            }
+            
+            // Update chart type to bar for candlestick view
+            myChart.config.type = 'bar'
+            myChart.update()
+            
+            // Update summary table with yearly stats
+            const tempValid = jsondata.tempData.filter(d => d !== null)
+            const humValid = jsondata.humData.filter(d => d !== null)
+            
+            const summaryData = []
+            if (tempValid.length > 0) {
+                summaryData.push({
+                    label: '&#127777; Temp: ' + jsondata.deviceLabel,
+                    min: Math.min(...tempValid.map(d => d.min)).toFixed(1),
+                    max: Math.max(...tempValid.map(d => d.max)).toFixed(1),
+                    curr: tempValid[tempValid.length - 1]?.avg || '-'
+                })
+            }
+            if (humValid.length > 0) {
+                summaryData.push({
+                    label: '&#x1F4A7; Hum: ' + jsondata.deviceLabel,
+                    min: Math.min(...humValid.map(d => d.min)).toFixed(1),
+                    max: Math.max(...humValid.map(d => d.max)).toFixed(1),
+                    curr: humValid[humValid.length - 1]?.avg || '-'
+                })
+            }
+            
+            myTable.setData(summaryData)
+            document.getElementById('timestamp').innerHTML = 'Vue annuelle par semaine'
+            Spinner.hide()
+        }
+    }
+    xhr.send(null)
+}
+
+const loadData = (depth, forecast, device) => {
+    // Update current depth for x-axis formatting
+    currentDepth = parseInt(depth) + parseInt(forecast)
+    
+    // Handle "Année" view (8760 hours = 1 year)
+    if (parseInt(depth) >= 8760) {
+        if (device === 'All') {
+            Spinner.hide()
+            showMessage('Sélectionner un thermomètre')
+            myTable.setData([])
+            return
+        }
+        hideMessage()
+        loadYearData(device)
+        return
+    }
+    
+    // Normal line chart view
+    hideMessage()
+    
+    // Reset chart type to line if it was changed
+    if (myChart.config.type !== 'LineAlt') {
+        myChart.config.type = 'LineAlt'
+    }
+    
+    var xhr = new XMLHttpRequest()
+    Spinner.show()
+    
     xhr.open("GET", `./data?depth=${depth}&forecast=${forecast}&device=${device}`)
     xhr.onreadystatechange = () => { 
         if (xhr.readyState === 4 && xhr.status === 200) {

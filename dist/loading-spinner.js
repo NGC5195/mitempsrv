@@ -1,62 +1,122 @@
 /*
-
+  Modern CSS-animated Spinner
+  More efficient than JS animation (uses GPU acceleration)
 */
 'use strict';
-function Spinner(){
-	Spinner.element=document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-	let c=document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-	Spinner.element.setAttribute('width','100');
-	Spinner.element.setAttribute('height','100');
-	c.setAttribute('viewBox','0 0 100 100');
-	c.setAttribute('cx','50');
-	c.setAttribute('cy','50');
-	c.setAttribute('r','42');
-	c.setAttribute('stroke-width','16');
-	c.setAttribute('stroke','#2196f3');
-	c.setAttribute('fill','transparent');
-	Spinner.element.appendChild(c);
-	Spinner.element.style.cssText='position:absolute;left:calc(50% - 50px);top:calc(50% - 50px)';
-	document.body.appendChild(Spinner.element)
+
+function Spinner() {
+  // Create overlay container
+  Spinner.overlay = document.createElement('div');
+  Spinner.overlay.className = 'spinner-overlay';
+  
+  // Create spinner container
+  const spinnerContainer = document.createElement('div');
+  spinnerContainer.className = 'spinner-container';
+  
+  // Create the spinner element (pulsing dots)
+  Spinner.element = document.createElement('div');
+  Spinner.element.className = 'spinner-dots';
+  Spinner.element.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  
+  // Create loading text
+  const loadingText = document.createElement('div');
+  loadingText.className = 'spinner-text';
+  loadingText.textContent = 'Chargement...';
+  
+  spinnerContainer.appendChild(Spinner.element);
+  spinnerContainer.appendChild(loadingText);
+  Spinner.overlay.appendChild(spinnerContainer);
+  
+  // Add styles
+  const style = document.createElement('style');
+  style.textContent = `
+    .spinner-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(2px);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .spinner-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #e0e0e0;
+      border-top: 4px solid #2196f3;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    .spinner-text {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #666;
+      letter-spacing: 0.5px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Alternative: Pulsing dots spinner */
+    .spinner-dots {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .spinner-dots .dot {
+      width: 12px;
+      height: 12px;
+      background: #2196f3;
+      border-radius: 50%;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    
+    .spinner-dots .dot:nth-child(1) { animation-delay: 0s; }
+    .spinner-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+    .spinner-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+    
+    @keyframes pulse {
+      0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.5;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+  `;
+  
+  document.head.appendChild(style);
+  document.body.appendChild(Spinner.overlay);
 }
-Spinner.id=null;
-Spinner.element=null;
-Spinner.show=function(){
-	const c=264,m=15;
-	Spinner.element.style.display='block';
-	move1();
-	function move1(){
-		let i=0,o=0;
-		move();
-		function move(){
-			if(i==c)move2();
-			else{
-				i+=4;o+=8;
-				Spinner.element.setAttribute('stroke-dasharray',i+' '+(c-i));
-				Spinner.element.setAttribute('stroke-dashoffset',o)
-				Spinner.id=setTimeout(move,m)
-			}
-		}
-	}
-	function move2(){
-		let i=c,o=c*2;
-		move();
-		function move(){
-			if(i==0)move1();
-			else{
-				i-=4;o+=4;
-				Spinner.element.setAttribute('stroke-dasharray',i+' '+(c-i));
-				Spinner.element.setAttribute('stroke-dashoffset',o)
-				Spinner.id=setTimeout(move,m)
-			}
-		}
-	}
+
+Spinner.overlay = null;
+Spinner.element = null;
+
+Spinner.show = function() {
+  if (Spinner.overlay) {
+    Spinner.overlay.style.display = 'flex';
+  }
 };
-Spinner.hide=function(){
-	Spinner.element.style.display='none';
-	if(Spinner.id){
-		clearTimeout(Spinner.id);
-		Spinner.id=null
-	}
-	Spinner.element.setAttribute('stroke-dasharray','0 264');
-	Spinner.element.setAttribute('stroke-dashoffset','0')
+
+Spinner.hide = function() {
+  if (Spinner.overlay) {
+    Spinner.overlay.style.display = 'none';
+  }
 };

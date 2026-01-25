@@ -326,6 +326,124 @@ app.get('/rasp/data', (req, res) => {
   })
 })
 
+// Get week number from date
+const getWeekNumber = (date) => {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7))
+  const yearStart = new Date(d.getFullYear(), 0, 1)
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
+  return { year: d.getFullYear(), week: weekNo }
+}
+
+// Get Monday of a given week
+const getWeekStart = (year, week) => {
+  const simple = new Date(year, 0, 1 + (week - 1) * 7)
+  const dow = simple.getDay()
+  const weekStart = simple
+  if (dow <= 4) {
+    weekStart.setDate(simple.getDate() - simple.getDay() + 1)
+  } else {
+    weekStart.setDate(simple.getDate() + 8 - simple.getDay())
+  }
+  return weekStart
+}
+
+// Load yearly data with weekly aggregation for candlestick chart
+const loadYearlyDataFromRedis = async (device, callback) => {
+  const startTime = Date.now()
+  console.log(`[loadYearlyData] Starting - device=${device}`)
+  
+  // Get data for the past year (8760 hours)
+  const { startTs, endTs } = getTimestampRange(8760, 0)
+  console.log(`[loadYearlyData] Time range: ${new Date(startTs * 1000).toISOString()} to ${new Date(endTs * 1000).toISOString()}`)
+  
+  // Fetch data for the single device
+  const dataByDevice = await batchGetDeviceData([device], startTs, endTs)
+  const rawData = dataByDevice[device] || []
+  
+  console.log(`[loadYearlyData] Got ${rawData.length} raw data points`)
+  
+  // Get device metadata
+  const deviceMeta = await getCachedDeviceInfo(device)
+  
+  // Group data by week
+  const weeklyData = new Map() // key: "YYYY-WW" -> { temps: [], hums: [], weekStart: Date }
+  
+  rawData.forEach(dp => {
+    if (dp.datetime && dp.temp !== null && dp.temp !== undefined) {
+      const ts = parseDateTimeString(dp.datetime)
+      if (ts) {
+        const { year, week } = getWeekNumber(ts)
+        const weekKey = `${year}-${String(week).padStart(2, '0')}`
+        
+        if (!weeklyData.has(weekKey)) {
+          weeklyData.set(weekKey, {
+            temps: [],
+            hums: [],
+            weekStart: getWeekStart(year, week)
+          })
+        }
+        
+        const weekData = weeklyData.get(weekKey)
+        if (dp.temp !== null) weekData.temps.push(parseFloat(dp.temp))
+        if (dp.hum !== null) weekData.hums.push(parseFloat(dp.hum))
+      }
+    }
+  })
+  
+  console.log(`[loadYearlyData] Aggregated into ${weeklyData.size} weeks`)
+  
+  // Sort weeks and build candlestick data
+  const sortedWeeks = Array.from(weeklyData.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  
+  const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+  
+  const labels = sortedWeeks.map(([, data]) => {
+    const d = data.weekStart
+    return `${pad02(d.getDate())}-${monthLabel[d.getMonth()]}`
+  })
+  
+  // Build candlestick data for temperature
+  const tempCandlestick = sortedWeeks.map(([, data]) => {
+    if (data.temps.length === 0) return null
+    const min = Math.min(...data.temps)
+    const max = Math.max(...data.temps)
+    const avg = data.temps.reduce((a, b) => a + b, 0) / data.temps.length
+    return { min, max, avg: avg.toFixed(1) }
+  })
+  
+  // Build candlestick data for humidity
+  const humCandlestick = sortedWeeks.map(([, data]) => {
+    if (data.hums.length === 0) return null
+    const min = Math.min(...data.hums)
+    const max = Math.max(...data.hums)
+    const avg = data.hums.reduce((a, b) => a + b, 0) / data.hums.length
+    return { min, max, avg: avg.toFixed(1) }
+  })
+  
+  const message = {
+    chartType: 'candlestick',
+    labels: labels,
+    deviceLabel: deviceMeta.label || device,
+    tempColor: deviceMeta.tempColor || '#FF6384',
+    humColor: deviceMeta.humColor || '#36A2EB',
+    tempData: tempCandlestick,
+    humData: humCandlestick
+  }
+  
+  const duration = Date.now() - startTime
+  console.log(`[loadYearlyData] Completed in ${duration}ms - ${labels.length} weeks`)
+  callback(message)
+}
+
+app.get('/rasp/yeardata', (req, res) => {
+  console.log(`[HTTP] GET /rasp/yeardata?device=${req.query.device}`)
+  loadYearlyDataFromRedis(req.query.device, (message) => {
+    sendJsonString(JSON.stringify(message), req, res)
+  })
+})
+
 app.get('/rasp/summary', (req, res) => {
   console.log(`[HTTP] GET /rasp/summary?depth=${req.query.depth}&forecast=${req.query.forecast}&device=${req.query.device}`)
   loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
