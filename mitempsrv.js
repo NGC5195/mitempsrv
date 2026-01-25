@@ -35,14 +35,16 @@ const smembers = async (key) => {
 }
 
 // Get timestamp range for query (depth hours back, forecast hours forward)
+// Returns Unix timestamps in SECONDS (not milliseconds) to match Python/Redis
 const getTimestampRange = (depthHours, forecastHours) => {
   const now = new Date()
   now.setMinutes(0, 0, 0) // Round to current hour
   
-  const startTs = now.getTime() - (depthHours * 3600000)
-  const endTs = now.getTime() + (forecastHours * 3600000)
+  const nowSeconds = Math.floor(now.getTime() / 1000)
+  const startTs = nowSeconds - (depthHours * 3600)
+  const endTs = nowSeconds + (forecastHours * 3600)
   
-  return { startTs, endTs, currentTs: now.getTime() }
+  return { startTs, endTs, currentTs: nowSeconds }
 }
 
 // Batch fetch data for multiple devices using pipeline (1 Redis roundtrip for all devices)
@@ -146,7 +148,8 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
   const chartLabels = sortedTimestamps.map(ts => formatTimestamp(ts))
 
   // Find current index (closest to now) for "current" value display
-  const currentIdx = sortedTimestamps.findIndex(ts => ts >= currentTs)
+  // Note: sortedTimestamps are in milliseconds, currentTs is in seconds
+  const currentIdx = sortedTimestamps.findIndex(ts => ts >= currentTs * 1000)
   const currIdx = currentIdx >= 0 ? currentIdx : sortedTimestamps.length - 1
 
   const getMinMax = (data, currIdx) => {
