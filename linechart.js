@@ -360,8 +360,13 @@ const loadYearData = (device) => {
             }
             
             myTable.setData(summaryData)
-            const selectedYear = localStorage.getItem('selectedYear') || new Date().getFullYear()
-            document.getElementById('timestamp').innerHTML = 'Vue annuelle ' + selectedYear + ' par semaine'
+            const selectedYear = parseInt(localStorage.getItem('selectedYear')) || new Date().getFullYear()
+            const currentYear = new Date().getFullYear()
+            if (selectedYear === currentYear) {
+                document.getElementById('timestamp').innerHTML = '12 derniers mois par semaine'
+            } else {
+                document.getElementById('timestamp').innerHTML = 'Année ' + selectedYear + ' par semaine'
+            }
             Spinner.hide()
         }
     }

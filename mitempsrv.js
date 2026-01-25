@@ -352,11 +352,24 @@ const getWeekStart = (year, week) => {
 // Load yearly data with weekly aggregation for candlestick chart
 const loadYearlyDataFromRedis = async (device, year, callback) => {
   const startTime = Date.now()
-  console.log(`[loadYearlyData] Starting - device=${device}, year=${year}`)
+  const currentYear = new Date().getFullYear()
+  console.log(`[loadYearlyData] Starting - device=${device}, year=${year}, currentYear=${currentYear}`)
   
-  // Calculate time range for the specified year
-  const startTs = Math.floor(new Date(year, 0, 1, 0, 0, 0).getTime() / 1000)  // Jan 1st 00:00
-  const endTs = Math.floor(new Date(year, 11, 31, 23, 59, 59).getTime() / 1000)  // Dec 31st 23:59
+  let startTs, endTs
+  
+  if (year === currentYear) {
+    // Current year: show last 12 months (today - 1 year to today)
+    const now = new Date()
+    endTs = Math.floor(now.getTime() / 1000)
+    const oneYearAgo = new Date(now)
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+    startTs = Math.floor(oneYearAgo.getTime() / 1000)
+    console.log(`[loadYearlyData] Current year mode: last 12 months`)
+  } else {
+    // Past year: show full year (Jan 1 to Dec 31)
+    startTs = Math.floor(new Date(year, 0, 1, 0, 0, 0).getTime() / 1000)  // Jan 1st 00:00
+    endTs = Math.floor(new Date(year, 11, 31, 23, 59, 59).getTime() / 1000)  // Dec 31st 23:59
+  }
   console.log(`[loadYearlyData] Time range: ${new Date(startTs * 1000).toISOString()} to ${new Date(endTs * 1000).toISOString()}`)
   
   // Fetch data for the single device
@@ -368,8 +381,9 @@ const loadYearlyDataFromRedis = async (device, year, callback) => {
   // Get device metadata
   const deviceMeta = await getCachedDeviceInfo(device)
   
-  // Group data by week (only for the selected year)
+  // Group data by week
   const weeklyData = new Map() // key: "YYYY-WW" -> { temps: [], hums: [], weekStart: Date }
+  const isCurrentYearMode = (year === currentYear)
   
   rawData.forEach(dp => {
     if (dp.datetime && dp.temp !== null && dp.temp !== undefined) {
@@ -377,8 +391,9 @@ const loadYearlyDataFromRedis = async (device, year, callback) => {
       if (ts) {
         const { year: dataYear, week } = getWeekNumber(ts)
         
-        // Only include data from the selected year
-        if (dataYear !== year) return
+        // For current year mode, include data from both years (last 12 months)
+        // For past years, only include data from that specific year
+        if (!isCurrentYearMode && dataYear !== year) return
         
         const weekKey = `${dataYear}-${String(week).padStart(2, '0')}`
         
