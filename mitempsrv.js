@@ -1,3 +1,9 @@
+// Debugin
+// sudo journalctl -u mitemp.service -f
+// tail -f /var/log/nginx/error.log
+// sudo systemctl restart nginx
+// sudo systemctl restart mitemp.service
+
 const v8 = require('v8')
 const asyncRedis = require('async-redis')
 const compression = require('compression')
@@ -30,7 +36,9 @@ const sendJsonString = (jsonString, req, res) => {
 }
 
 const smembers = async (key) => {
+  console.log(`[Redis] SMEMBERS ${key}`)
   const values = await redisClient.smembers(key)
+  console.log(`[Redis] SMEMBERS ${key} -> ${values.length} members`)
   return values
 }
 
@@ -51,19 +59,24 @@ const getTimestampRange = (depthHours, forecastHours) => {
 const batchGetDeviceData = async (deviceIds, startTs, endTs) => {
   if (deviceIds.length === 0) return {}
   
+  console.log(`[Redis] PIPELINE ZRANGEBYSCORE for ${deviceIds.length} devices (${startTs} to ${endTs})`)
   const pipeline = redisClient.batch()
   deviceIds.forEach(deviceId => {
     const key = `device:${deviceId}:data`
+    console.log(`[Redis]   - ZRANGEBYSCORE ${key} ${startTs} ${endTs}`)
     pipeline.zrangebyscore(key, startTs, endTs)
   })
   
   return new Promise((resolve, reject) => {
     pipeline.exec((err, results) => {
-      if (err) reject(err)
-      else {
+      if (err) {
+        console.log(`[Redis] PIPELINE ERROR: ${err}`)
+        reject(err)
+      } else {
         const dataByDevice = {}
         deviceIds.forEach((deviceId, i) => {
           const rawData = results[i] || []
+          console.log(`[Redis]   - ${deviceId}: ${rawData.length} data points`)
           dataByDevice[deviceId] = rawData.map(jsonStr => {
             try {
               return JSON.parse(jsonStr)
@@ -72,6 +85,7 @@ const batchGetDeviceData = async (deviceIds, startTs, endTs) => {
             }
           })
         })
+        console.log(`[Redis] PIPELINE completed`)
         resolve(dataByDevice)
       }
     })
@@ -86,43 +100,66 @@ const DEVICE_CACHE_TTL = 60000 // 1 minute
 const getCachedDeviceInfo = async (deviceId) => {
   const now = Date.now()
   if (!deviceInfoCache || now - deviceInfoCacheTime > DEVICE_CACHE_TTL) {
+    console.log(`[Redis] Refreshing device info cache (TTL expired or first load)`)
+    console.log(`[Redis] SMEMBERS devices`)
     const devices = await redisClient.smembers('devices')
+    console.log(`[Redis] SMEMBERS devices -> ${devices.length} devices`)
+    
+    console.log(`[Redis] PIPELINE HGETALL for ${devices.length} devices`)
     const pipeline = redisClient.batch()
-    devices.forEach(dv => pipeline.hgetall(dv))
+    devices.forEach(dv => {
+      console.log(`[Redis]   - HGETALL ${dv}`)
+      pipeline.hgetall(dv)
+    })
     
     deviceInfoCache = await new Promise((resolve, reject) => {
       pipeline.exec((err, results) => {
-        if (err) reject(err)
-        else {
+        if (err) {
+          console.log(`[Redis] PIPELINE ERROR: ${err}`)
+          reject(err)
+        } else {
           const cache = {}
           devices.forEach((dv, i) => {
             cache[dv] = results[i] || {}
+            console.log(`[Redis]   - ${dv}: label=${cache[dv].label}`)
           })
+          console.log(`[Redis] Device info cache updated`)
           resolve(cache)
         }
       })
     })
     deviceInfoCacheTime = now
+  } else {
+    console.log(`[Redis] Using cached device info (cache age: ${now - deviceInfoCacheTime}ms)`)
   }
   return deviceInfoCache[deviceId] || {}
 }
 
 const deviceInfo = async () => {
+  console.log(`[Redis] SMEMBERS devices (for /devices endpoint)`)
   const devices = await redisClient.smembers('devices')
+  console.log(`[Redis] SMEMBERS devices -> ${devices.length} devices`)
   return Promise.all(devices.map(async (x) => {
+    console.log(`[Redis] HGET ${x} label`)
     const label = await redisClient.hget(x, 'label')
+    console.log(`[Redis] HGET ${x} label -> ${label}`)
     return { id: x, label: label }
   }))
 }
 
 const loadDataFromRedis = async (depth, forecast, device, callback) => {
+  const startTime = Date.now()
+  console.log(`[loadData] Starting - depth=${depth}h, forecast=${forecast}h, device=${device}`)
+  
   const tempDevices = await smembers("devices")
   
   // Filter devices
   const filteredDevices = tempDevices.filter((x) => device === 'All' || device == x)
+  console.log(`[loadData] Filtered devices: ${filteredDevices.length} of ${tempDevices.length}`)
 
   // Get timestamp range for the query
   const { startTs, endTs, currentTs } = getTimestampRange(depth, forecast)
+  console.log(`[loadData] Time range: ${new Date(startTs * 1000).toISOString()} to ${new Date(endTs * 1000).toISOString()}`)
 
   // Single batch fetch for all devices (1 Redis roundtrip!)
   const dataByDevice = await batchGetDeviceData(filteredDevices, startTs, endTs)
@@ -221,6 +258,9 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
     summary: getMinMax(allDatasets, currIdx),
     timestamp: chartLabels[currIdx] || ''
   }
+  
+  const duration = Date.now() - startTime
+  console.log(`[loadData] Completed in ${duration}ms - ${chartLabels.length} data points, ${allDatasets.length} datasets`)
   callback(message)
 }
 
@@ -249,12 +289,14 @@ app.use('/rasp', favicon(__dirname + '/icon.png'))
 // app.use(session)
 
 app.get('/rasp/data', (req, res) => {
+  console.log(`[HTTP] GET /rasp/data?depth=${req.query.depth}&forecast=${req.query.forecast}&device=${req.query.device}`)
   loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
     sendJsonString(JSON.stringify(message), req, res)
   })
 })
 
 app.get('/rasp/summary', (req, res) => {
+  console.log(`[HTTP] GET /rasp/summary?depth=${req.query.depth}&forecast=${req.query.forecast}&device=${req.query.device}`)
   loadDataFromRedis(parseInt(req.query.depth), parseInt(req.query.forecast),req.query.device, (message) => {
     res.type('text/html')
     var innerHTML = "summary"
@@ -264,10 +306,12 @@ app.get('/rasp/summary', (req, res) => {
 })
 
 app.get('/rasp/devices', (req, res) => {
+  console.log(`[HTTP] GET /rasp/devices`)
   deviceInfo().then((dvlist) => {
     const devices = dvlist.map((dv) => {
       return {id: dv.id, label: dv.label}
     })
+    console.log(`[HTTP] /rasp/devices -> ${devices.length} devices`)
     sendJsonString(JSON.stringify(devices), req, res)
   })
 })
