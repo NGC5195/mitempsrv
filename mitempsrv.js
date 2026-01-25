@@ -350,12 +350,13 @@ const getWeekStart = (year, week) => {
 }
 
 // Load yearly data with weekly aggregation for candlestick chart
-const loadYearlyDataFromRedis = async (device, callback) => {
+const loadYearlyDataFromRedis = async (device, year, callback) => {
   const startTime = Date.now()
-  console.log(`[loadYearlyData] Starting - device=${device}`)
+  console.log(`[loadYearlyData] Starting - device=${device}, year=${year}`)
   
-  // Get data for the past year (8760 hours)
-  const { startTs, endTs } = getTimestampRange(8760, 0)
+  // Calculate time range for the specified year
+  const startTs = Math.floor(new Date(year, 0, 1, 0, 0, 0).getTime() / 1000)  // Jan 1st 00:00
+  const endTs = Math.floor(new Date(year, 11, 31, 23, 59, 59).getTime() / 1000)  // Dec 31st 23:59
   console.log(`[loadYearlyData] Time range: ${new Date(startTs * 1000).toISOString()} to ${new Date(endTs * 1000).toISOString()}`)
   
   // Fetch data for the single device
@@ -367,21 +368,25 @@ const loadYearlyDataFromRedis = async (device, callback) => {
   // Get device metadata
   const deviceMeta = await getCachedDeviceInfo(device)
   
-  // Group data by week
+  // Group data by week (only for the selected year)
   const weeklyData = new Map() // key: "YYYY-WW" -> { temps: [], hums: [], weekStart: Date }
   
   rawData.forEach(dp => {
     if (dp.datetime && dp.temp !== null && dp.temp !== undefined) {
       const ts = parseDateTimeString(dp.datetime)
       if (ts) {
-        const { year, week } = getWeekNumber(ts)
-        const weekKey = `${year}-${String(week).padStart(2, '0')}`
+        const { year: dataYear, week } = getWeekNumber(ts)
+        
+        // Only include data from the selected year
+        if (dataYear !== year) return
+        
+        const weekKey = `${dataYear}-${String(week).padStart(2, '0')}`
         
         if (!weeklyData.has(weekKey)) {
           weeklyData.set(weekKey, {
             temps: [],
             hums: [],
-            weekStart: getWeekStart(year, week)
+            weekStart: getWeekStart(dataYear, week)
           })
         }
         
@@ -438,8 +443,9 @@ const loadYearlyDataFromRedis = async (device, callback) => {
 }
 
 app.get('/rasp/yeardata', (req, res) => {
-  console.log(`[HTTP] GET /rasp/yeardata?device=${req.query.device}`)
-  loadYearlyDataFromRedis(req.query.device, (message) => {
+  const year = parseInt(req.query.year) || new Date().getFullYear()
+  console.log(`[HTTP] GET /rasp/yeardata?device=${req.query.device}&year=${year}`)
+  loadYearlyDataFromRedis(req.query.device, year, (message) => {
     sendJsonString(JSON.stringify(message), req, res)
   })
 })

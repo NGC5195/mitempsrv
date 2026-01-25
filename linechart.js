@@ -74,11 +74,52 @@ const formatDateTime = (str) => {
         hour: time[1]
     }
   }
+// Populate year selector with last 5 years
+const initYearSelector = () => {
+    const yearSelect = document.getElementById('year-select')
+    const currentYear = new Date().getFullYear()
+    
+    // Clear existing options
+    yearSelect.innerHTML = ''
+    
+    // Add last 5 years
+    for (let i = 0; i < 5; i++) {
+        const year = currentYear - i
+        const option = document.createElement('option')
+        option.value = year
+        option.textContent = year
+        yearSelect.appendChild(option)
+    }
+    
+    // Set stored value or current year
+    const storedYear = localStorage.getItem('selectedYear')
+    if (storedYear && parseInt(storedYear) >= currentYear - 4) {
+        yearSelect.value = storedYear
+    } else {
+        yearSelect.value = currentYear
+        localStorage.setItem('selectedYear', currentYear)
+    }
+}
+
+// Show/hide year selector based on period
+const updateYearSelectorVisibility = (depth) => {
+    const yearContainer = document.getElementById('year-selector-container')
+    if (parseInt(depth) >= 8760) {
+        yearContainer.style.display = 'block'
+    } else {
+        yearContainer.style.display = 'none'
+    }
+}
+
 const selectPeriod = (o) => {
     const depth = o.options[o.selectedIndex].value
     localStorage.setItem('depth', depth)
     const device = localStorage.getItem('device')
     const forecast = localStorage.getItem('forecast')
+    
+    // Show/hide year selector
+    updateYearSelectorVisibility(depth)
+    
     loadData(depth, forecast, device)
 }
 
@@ -96,6 +137,18 @@ const selectdevices = (o) => {
     const depth = localStorage.getItem('depth')
     const forecast = localStorage.getItem('forecast')
     loadData(depth, forecast, device)
+}
+
+const selectYear = (o) => {
+    const year = o.options[o.selectedIndex].value
+    localStorage.setItem('selectedYear', year)
+    const device = localStorage.getItem('device')
+    const depth = localStorage.getItem('depth')
+    
+    // Reload data with new year
+    if (parseInt(depth) >= 8760) {
+        loadData(depth, 0, device)
+    }
 }
 
 const refreshDevices = (id, callback) => {
@@ -250,7 +303,8 @@ const loadYearData = (device) => {
     var xhr = new XMLHttpRequest()
     Spinner.show()
     
-    xhr.open("GET", `./yeardata?device=${device}`)
+    const selectedYear = localStorage.getItem('selectedYear') || new Date().getFullYear()
+    xhr.open("GET", `./yeardata?device=${device}&year=${selectedYear}`)
     xhr.onreadystatechange = () => {
         if (xhr.readyState === 4 && xhr.status === 200) {
             const jsondata = JSON.parse(xhr.responseText)
@@ -306,7 +360,8 @@ const loadYearData = (device) => {
             }
             
             myTable.setData(summaryData)
-            document.getElementById('timestamp').innerHTML = 'Vue annuelle par semaine'
+            const selectedYear = localStorage.getItem('selectedYear') || new Date().getFullYear()
+            document.getElementById('timestamp').innerHTML = 'Vue annuelle ' + selectedYear + ' par semaine'
             Spinner.hide()
         }
     }
@@ -390,9 +445,15 @@ refreshDevices('devices', ()=> {
     document.getElementById('devices-select').value = device
 })
 
+// Initialize year selector
+initYearSelector()
 
 document.getElementById('period-select').value = depth
 document.getElementById('forecast-select').value = forecast
+
+// Show/hide year selector based on initial depth
+updateYearSelectorVisibility(depth)
+
 Spinner();
 loadData(depth, forecast, device)
 refresh()
