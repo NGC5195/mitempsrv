@@ -34,99 +34,52 @@ const smembers = async (key) => {
   return values
 }
 
-// Convert datetime string "MM/DD/YYYY-HH" to Unix timestamp
-const dateTimeToTimestamp = (dtStr) => {
-  const [datePart, hour] = dtStr.split('-')
-  const [month, day, year] = datePart.split('/')
-  return new Date(year, month - 1, day, parseInt(hour)).getTime()
-}
-
-// Convert Unix timestamp back to datetime string "MM/DD/YYYY-HH"
-const timestampToDateTime = (ts) => {
-  const d = new Date(ts)
-  return `${pad02(d.getMonth() + 1)}/${pad02(d.getDate())}/${d.getFullYear()}-${pad02(d.getHours())}`
-}
-
-// Get datetime keys for a specific time range (last N hours + forecast hours)
-// Uses sampling for long periods to reduce data points
-const getDateTimeRange = (depthHours, forecastHours) => {
+// Get timestamp range for query (depth hours back, forecast hours forward)
+const getTimestampRange = (depthHours, forecastHours) => {
   const now = new Date()
   now.setMinutes(0, 0, 0) // Round to current hour
   
-  const totalHours = depthHours + forecastHours
+  const startTs = now.getTime() - (depthHours * 3600000)
+  const endTs = now.getTime() + (forecastHours * 3600000)
   
-  // Sampling: reduce data points for long periods
-  // <= 72h: every hour (max 72 points)
-  // <= 168h (week): every 2 hours (max 84 points)  
-  // > 168h (month): every 4 hours (max 168 points)
-  let step = 1
-  if (totalHours > 168) step = 4
-  else if (totalHours > 72) step = 2
-  
-  const result = []
-  for (let h = -depthHours; h <= forecastHours; h += step) {
-    const d = new Date(now.getTime() + h * 3600000)
-    result.push(`${pad02(d.getMonth() + 1)}/${pad02(d.getDate())}/${d.getFullYear()}-${pad02(d.getHours())}`)
-  }
-  return result
+  return { startTs, endTs, currentTs: now.getTime() }
 }
 
-// Batch fetch data in chunks to avoid overwhelming Pi Zero
-const CHUNK_SIZE = 50 // Process 50 keys at a time
-
-const batchGetTempHum = async (keys) => {
-  if (keys.length === 0) return []
+// Batch fetch data for multiple devices using pipeline (1 Redis roundtrip for all devices)
+const batchGetDeviceData = async (deviceIds, startTs, endTs) => {
+  if (deviceIds.length === 0) return {}
   
-  const results = []
+  const pipeline = redisClient.batch()
+  deviceIds.forEach(deviceId => {
+    const key = `device:${deviceId}:data`
+    pipeline.zrangebyscore(key, startTs, endTs)
+  })
   
-  // Process in chunks to avoid memory/CPU issues on Pi Zero
-  for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
-    const chunk = keys.slice(i, i + CHUNK_SIZE)
-    const pipeline = redisClient.batch()
-    chunk.forEach(key => pipeline.hgetall(key))
-    
-    const chunkResults = await new Promise((resolve, reject) => {
-      pipeline.exec((err, res) => {
-        if (err) reject(err)
-        else resolve(res)
-      })
+  return new Promise((resolve, reject) => {
+    pipeline.exec((err, results) => {
+      if (err) reject(err)
+      else {
+        const dataByDevice = {}
+        deviceIds.forEach((deviceId, i) => {
+          const rawData = results[i] || []
+          dataByDevice[deviceId] = rawData.map(jsonStr => {
+            try {
+              return JSON.parse(jsonStr)
+            } catch (e) {
+              return { temp: null, hum: null, batt: null, datetime: null }
+            }
+          })
+        })
+        resolve(dataByDevice)
+      }
     })
-    
-    results.push(...chunkResults.map(r => r || { temp: null, hum: null, rain: null }))
-  }
-  
-  return results
+  })
 }
 
 // Cache device info (colors, labels) - they rarely change
 let deviceInfoCache = null
 let deviceInfoCacheTime = 0
 const DEVICE_CACHE_TTL = 60000 // 1 minute
-
-// Response cache - cache full API responses for 5 minutes
-const responseCache = new Map()
-const RESPONSE_CACHE_TTL = 300000 // 5 minutes
-
-const getCacheKey = (depth, forecast, device) => `${depth}-${forecast}-${device}`
-
-const getCachedResponse = (depth, forecast, device) => {
-  const key = getCacheKey(depth, forecast, device)
-  const cached = responseCache.get(key)
-  if (cached && Date.now() - cached.time < RESPONSE_CACHE_TTL) {
-    return cached.data
-  }
-  return null
-}
-
-const setCachedResponse = (depth, forecast, device, data) => {
-  const key = getCacheKey(depth, forecast, device)
-  responseCache.set(key, { data, time: Date.now() })
-  // Clean old entries (keep max 20)
-  if (responseCache.size > 20) {
-    const oldest = responseCache.keys().next().value
-    responseCache.delete(oldest)
-  }
-}
 
 const getCachedDeviceInfo = async (deviceId) => {
   const now = Date.now()
@@ -160,95 +113,95 @@ const deviceInfo = async () => {
   }))
 }
 
-const formatDateTime = (str) => {
-  const time = str.split('-');
-  const date = time[0].split('/');
-  return date[1] + '/' + date[0] + '/' + date[2] + ' ' + time[1] + 'h'
-}
-
 const loadDataFromRedis = async (depth, forecast, device, callback) => {
-  // Check response cache first (instant response for repeated queries)
-  const cached = getCachedResponse(depth, forecast, device)
-  if (cached) {
-    console.log(`Cache hit for depth=${depth}, forecast=${forecast}, device=${device}`)
-    return callback(cached)
-  }
-  
-  console.log(`Cache miss - fetching from Redis: depth=${depth}, forecast=${forecast}, device=${device}`)
-  const startTime = Date.now()
-  
   const tempDevices = await smembers("devices")
   
   // Filter devices
   const filteredDevices = tempDevices.filter((x) => device === 'All' || device == x)
 
-  // Generate only the datetime range we need (with sampling for long periods)
-  const tempDateTimeFiltered = getDateTimeRange(depth, forecast)
-  console.log(`Fetching ${tempDateTimeFiltered.length} time points for ${filteredDevices.length} devices = ${tempDateTimeFiltered.length * filteredDevices.length} keys`)
+  // Get timestamp range for the query
+  const { startTs, endTs, currentTs } = getTimestampRange(depth, forecast)
+
+  // Single batch fetch for all devices (1 Redis roundtrip!)
+  const dataByDevice = await batchGetDeviceData(filteredDevices, startTs, endTs)
+
+  // Collect all unique timestamps and sort them for chart labels
+  const allTimestamps = new Set()
+  Object.values(dataByDevice).forEach(dataPoints => {
+    dataPoints.forEach(dp => {
+      if (dp.datetime) {
+        // Parse datetime string to get timestamp for sorting
+        const ts = new Date(dp.datetime).getTime()
+        if (!isNaN(ts)) allTimestamps.add(ts)
+      }
+    })
+  })
+  const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b)
+
+  // Format timestamps for chart labels (DD/MM/YYYY HHh)
+  const formatTimestamp = (ts) => {
+    const d = new Date(ts)
+    return `${pad02(d.getDate())}/${pad02(d.getMonth() + 1)}/${d.getFullYear()} ${pad02(d.getHours())}h`
+  }
+  const chartLabels = sortedTimestamps.map(ts => formatTimestamp(ts))
+
+  // Find current index (closest to now) for "current" value display
+  const currentIdx = sortedTimestamps.findIndex(ts => ts >= currentTs)
+  const currIdx = currentIdx >= 0 ? currentIdx : sortedTimestamps.length - 1
 
   const getMinMax = (data, currIdx) => {
     return data.reduce((acc, curr) => curr.concat(acc)).map((x) => {
       var label = x.label.replace(/Temp:/gi, '&#127777;').replace(/Pluie:/gi, '&#x1F327;').replace(/Hum:/gi, '&#x1F4A7;')
+      const validData = x.data.filter(v => v !== null && v !== undefined)
       return {
         label: label,
-        min: Math.min.apply(Math, x.data.filter((x)=>x)),
-        max: Math.max.apply(Math, x.data.filter((x)=>x)),
+        min: validData.length > 0 ? Math.min(...validData) : null,
+        max: validData.length > 0 ? Math.max(...validData) : null,
         curr: x.data[currIdx]
       }
     })
   }
 
-  // Build all keys we need to fetch (datetime-device combinations)
-  const allKeys = []
-  const keyMap = [] // Track which key belongs to which device
-  filteredDevices.forEach(dv => {
-    tempDateTimeFiltered.forEach(dt => {
-      allKeys.push(`${dt}-${dv}`)
-      keyMap.push({ device: dv, datetime: dt })
-    })
-  })
-
-  // Single batch fetch for ALL data points (1 Redis roundtrip instead of 1500+)
-  const allData = await batchGetTempHum(allKeys)
-
-  // Organize data by device
-  const dataByDevice = {}
-  filteredDevices.forEach(dv => { dataByDevice[dv] = [] })
-  
-  allData.forEach((data, i) => {
-    const { device } = keyMap[i]
-    dataByDevice[device].push({
-      temp: data.temp,
-      hum: data.hum,
-      rain: data.rain
-    })
-  })
-
   // Build chart datasets (device info is cached)
   const allDatasets = await Promise.all(filteredDevices.map(async (dv) => {
-    const deviceInfo = await getCachedDeviceInfo(dv)
-    const data = dataByDevice[dv]
+    const deviceMeta = await getCachedDeviceInfo(dv)
+    const rawData = dataByDevice[dv] || []
+    
+    // Create a map of timestamp -> data for this device
+    const dataMap = new Map()
+    rawData.forEach(dp => {
+      if (dp.datetime) {
+        const ts = new Date(dp.datetime).getTime()
+        if (!isNaN(ts)) dataMap.set(ts, dp)
+      }
+    })
+
+    // Align data to sorted timestamps (fill nulls for missing points)
+    const alignedData = sortedTimestamps.map(ts => {
+      const dp = dataMap.get(ts)
+      return dp || { temp: null, hum: null, batt: null }
+    })
     
     let dateforChar = [{
-      label: 'Temp: ' + deviceInfo.label,
+      label: 'Temp: ' + deviceMeta.label,
       fill: false,
-      borderColor: deviceInfo.tempColor,
-      data: data.map(o => o.temp),
+      borderColor: deviceMeta.tempColor,
+      data: alignedData.map(o => o.temp !== null ? parseFloat(o.temp) : null),
       yAxisID: 'right-y-axis'
     },
     {
-      label: 'Hum: ' + deviceInfo.label,
+      label: 'Hum: ' + deviceMeta.label,
       fill: false,
-      borderColor: deviceInfo.humColor,
-      data: data.map(o => o.hum),
+      borderColor: deviceMeta.humColor,
+      data: alignedData.map(o => o.hum !== null ? parseFloat(o.hum) : null),
       yAxisID: 'left-y-axis'
     }]
     
     if (dv == 'infoclimat1') {
       dateforChar.push({
-        label: 'Pluie: ' + deviceInfo.label,
+        label: 'Pluie: ' + deviceMeta.label,
         fill: false,
-        data: data.map(o => o.rain),
+        data: alignedData.map(o => o.rain !== null ? parseFloat(o.rain) : null),
         yAxisID: 'right-y-axis',
         type: "bar"
       })
@@ -258,18 +211,13 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
 
   const message = {
     chartdata: {
-      labels: tempDateTimeFiltered.map(x => formatDateTime(x)),
+      labels: chartLabels,
       datasets: allDatasets.reduce((acc, curr) => curr.concat(acc)),
       borderWidth: 1
     },
-    summary: getMinMax(allDatasets, depth),
-    timestamp: tempDateTimeFiltered.map(x => formatDateTime(x))[depth]
+    summary: getMinMax(allDatasets, currIdx),
+    timestamp: chartLabels[currIdx] || ''
   }
-  
-  // Cache the response for next time
-  setCachedResponse(depth, forecast, device, message)
-  console.log(`Redis fetch completed in ${Date.now() - startTime}ms`)
-  
   callback(message)
 }
 
