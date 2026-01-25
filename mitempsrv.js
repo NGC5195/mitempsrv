@@ -1,5 +1,6 @@
 const v8 = require('v8')
 const asyncRedis = require('async-redis')
+const compression = require('compression')
 const redisClient = asyncRedis.createClient()
 "use strict"
 
@@ -170,9 +171,15 @@ var favicon = require('serve-favicon')
 //   saveUninitialized: true
 // })
 app.set('port', process.env.PORT || 3000)
-app.use('/rasp', express.static(__dirname + '/css/'))
-app.use('/rasp', express.static(__dirname + '/dist/'))
-app.use('/rasp', express.static(__dirname + '/.'))
+
+// Enable gzip compression for all responses (huge speedup on slow Pi Zero)
+app.use(compression())
+
+// Cache static assets for 1 day (86400 seconds) - reduces repeated downloads
+const staticOptions = { maxAge: '1d', etag: true }
+app.use('/rasp', express.static(__dirname + '/css/', staticOptions))
+app.use('/rasp', express.static(__dirname + '/dist/', staticOptions))
+app.use('/rasp', express.static(__dirname + '/.', staticOptions))
 app.use('/rasp', favicon(__dirname + '/icon.png'))
 // app.use(session)
 

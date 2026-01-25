@@ -10,9 +10,6 @@
     <link rel="stylesheet" href="./dist/tabulator_bootstrap4.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/png" href="favicon.ico" />
-    <script type="text/javascript" src="./dist/loading-spinner.js"></script>
-    <script type="text/javascript" src="./dist/Chart.js"></script>
-    <script type="text/javascript" src="./dist/tabulator.min.js"></script>
 </head>
 
 <body style="font-family:candara,courier,arial; ">
@@ -53,7 +50,11 @@
         <div id="spinner" role="progressbar"></div>
         <canvas id="myChart"></canvas>
         <div id="summary" class="table-sm"></div>
-        <script src="./linechart.js"></script>
     </div>
+    <!-- Scripts moved to end of body and using minified versions for faster loading -->
+    <script src="./dist/loading-spinner.js"></script>
+    <script src="./dist/Chart.min.js"></script>
+    <script src="./dist/tabulator.min.js"></script>
+    <script src="./linechart.js"></script>
 </body>
 </html>
