@@ -332,14 +332,7 @@ const myChart = new Chart(ctx, {
                     maxTicksLimit: 24,
                     autoSkip: false,
                     callback: (value, index, values) => {
-                        // For yearly view (labels are already in DD-MMM format)
-                        if (currentDepth >= 8760) {
-                            // Show every 4th label for readability
-                            return index % 4 === 0 ? value : null
-                        }
-                        
                         const date = formatDateTime(value)
-                        if (!date.hour) return value // Fallback if format doesn't match
                         
                         // Parse hour as number (handles "00h", "0h", "00", etc.)
                         const hour = parseInt(date.hour)
@@ -354,11 +347,6 @@ const myChart = new Chart(ctx, {
                             return date.hour
                         }
                         
-                        // For longer periods, show fewer labels
-                        if (currentDepth <= 72) {
-                            // Show hours at 6h, 12h, 18h
-                            return (hour % 6 === 0) ? date.hour : null
-                        }
                         
                         // For week/month, only show dates at midnight
                         return null
