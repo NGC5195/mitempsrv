@@ -20,17 +20,14 @@ const parseTimeToHours = (timeStr) => {
 }
 
 // Convert UTC hours to CET/CEST (handles daylight saving time)
-const utcToCET = (utcHours, date) => {
-    // Create a date object to check if DST is in effect
-    const d = new Date(date)
-    d.setUTCHours(Math.floor(utcHours))
+const utcToCET = (utcHours, dateStr) => {
+    // Parse date string "YYYY-MM-DD"
+    const [year, month, day] = dateStr.split('-').map(Number)
     
     // CET is UTC+1, CEST (summer) is UTC+2
-    // Check if date is in DST (last Sunday of March to last Sunday of October)
-    const month = d.getMonth()
-    const isDST = month > 2 && month < 9 // April to September is definitely DST
-        || (month === 2 && d.getDate() >= 25 && d.getDay() === 0) // End of March
-        || (month === 9 && d.getDate() < 25) // Beginning of October
+    // DST in Europe: last Sunday of March to last Sunday of October
+    // Simplified: April (4) to September (9) is definitely DST
+    const isDST = month >= 4 && month <= 9
     
     const offset = isDST ? 2 : 1
     let cetHours = utcHours + offset
@@ -51,16 +48,22 @@ const fetchSunData = async (dateStr) => {
         const data = await response.json()
         
         if (data.status === 'OK') {
-            const sunriseUTC = parseTimeToHours(data.results.nautical_twilight_begin)
-            const sunsetUTC = parseTimeToHours(data.results.nautical_twilight_end)
+            console.log(`[Sun API] ${dateStr}: raw sunrise=${data.results.sunrise}, sunset=${data.results.sunset}`)
+            
+            const sunriseUTC = parseTimeToHours(data.results.sunrise)
+            const sunsetUTC = parseTimeToHours(data.results.sunset)
+            console.log(`[Sun API] ${dateStr}: parsed UTC sunrise=${sunriseUTC?.toFixed(2)}h, sunset=${sunsetUTC?.toFixed(2)}h`)
+            
+            const sunriseCET = utcToCET(sunriseUTC, dateStr)
+            const sunsetCET = utcToCET(sunsetUTC, dateStr)
             
             const sunData = {
-                sunrise: Math.round(utcToCET(sunriseUTC, dateStr)), // Round to nearest hour
-                sunset: Math.round(utcToCET(sunsetUTC, dateStr))
+                sunrise: Math.round(sunriseCET), // Round to nearest hour
+                sunset: Math.round(sunsetCET)
             }
             
             sunDataCache.set(dateStr, sunData)
-            console.log(`[Sun] ${dateStr}: sunrise=${sunData.sunrise}h, sunset=${sunData.sunset}h (CET)`)
+            console.log(`[Sun] ${dateStr}: FINAL sunrise=${sunData.sunrise}h, sunset=${sunData.sunset}h (CET, rounded)`)
             return sunData
         }
     } catch (e) {
@@ -90,7 +93,11 @@ const prefetchSunData = async (labels) => {
 
 // Check if an hour is nighttime for a given date
 const isNightTime = (hour, dateStr) => {
-    const sunData = sunDataCache.get(dateStr) || { sunrise: 7, sunset: 18 }
+    const sunData = sunDataCache.get(dateStr)
+    if (!sunData) {
+        console.log(`[Night] No sun data for ${dateStr}, using defaults`)
+        return hour < 7 || hour >= 18
+    }
     return hour < sunData.sunrise || hour >= sunData.sunset
 }
 
