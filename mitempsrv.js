@@ -29,10 +29,22 @@ const parseDateTimeString = (dtStr) => {
   return ts
 }
 
-// Format timestamp (milliseconds) to chart label "DD/MM/YYYY HHh"
-const formatTimestampForChart = (ts) => {
+// Get date parts in CET timezone (Europe/Paris)
+const getDateInCET = (ts) => {
   const d = new Date(ts)
-  return `${pad02(d.getDate())}/${pad02(d.getMonth() + 1)}/${d.getFullYear()} ${pad02(d.getHours())}h`
+  const options = { timeZone: 'Europe/Paris', hour12: false }
+  return {
+    day: parseInt(d.toLocaleString('en-GB', { ...options, day: 'numeric' })),
+    month: parseInt(d.toLocaleString('en-GB', { ...options, month: 'numeric' })) - 1, // 0-indexed
+    year: parseInt(d.toLocaleString('en-GB', { ...options, year: 'numeric' })),
+    hour: parseInt(d.toLocaleString('en-GB', { ...options, hour: 'numeric' }))
+  }
+}
+
+// Format timestamp (milliseconds) to chart label "DD/MM/YYYY HHh" in CET timezone
+const formatTimestampForChart = (ts) => {
+  const p = getDateInCET(ts)
+  return `${pad02(p.day)}/${pad02(p.month + 1)}/${p.year} ${pad02(p.hour)}h`
 }
 
 const IsJsonString = (str) => {
@@ -423,8 +435,8 @@ const loadYearlyDataFromRedis = async (device, year, callback) => {
   const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
   
   const labels = sortedWeeks.map(([, data]) => {
-    const d = data.weekStart
-    return `${pad02(d.getDate())}-${monthLabel[d.getMonth()]}`
+    const p = getDateInCET(data.weekStart.getTime())
+    return `${pad02(p.day)}-${monthLabel[p.month]}`
   })
   
   // Build candlestick data for temperature
