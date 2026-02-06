@@ -332,13 +332,33 @@ const myChart = new Chart(ctx, {
                     maxTicksLimit: 24,
                     autoSkip: false,
                     callback: (value, index, values) => {
+                        // For yearly view (labels are already in DD-MMM format)
+                        if (currentDepth >= 8760) {
+                            return index % 4 === 0 ? value : null
+                        }
+                        
                         const date = formatDateTime(value)
+                        if (!date.hour) return value
                         
                         // Parse hour as number (handles "00h", "0h", "00", etc.)
                         const hour = parseInt(date.hour)
+                        const currentDay = date.day + '/' + date.month
                         
-                        // Show date "DD MMM" only at midnight (hour 0)
-                        if (hour === 0) {
+                        // Check if this is the first occurrence of this day
+                        let isFirstOfDay = (hour === 0) // Midnight is always first
+                        if (!isFirstOfDay && index > 0) {
+                            // Get previous label and check if day changed
+                            const prevValue = values[index - 1].value !== undefined ? values[index - 1].value : values[index - 1]
+                            const prevDate = formatDateTime(prevValue)
+                            const prevDay = prevDate.day + '/' + prevDate.month
+                            isFirstOfDay = (currentDay !== prevDay)
+                        }
+                        if (index === 0) {
+                            isFirstOfDay = true // First label always shows date
+                        }
+                        
+                        // Show date "DD MMM" at first hour of each day
+                        if (isFirstOfDay) {
                             return date.day + ' ' + monthLabel[parseInt(date.month) - 1]
                         }
                         
@@ -347,6 +367,10 @@ const myChart = new Chart(ctx, {
                             return date.hour
                         }
                         
+                        // For longer periods, show fewer labels
+                        if (currentDepth <= 72) {
+                            return (hour % 6 === 0) ? date.hour : null
+                        }
                         
                         // For week/month, only show dates at midnight
                         return null
