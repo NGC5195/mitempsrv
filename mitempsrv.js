@@ -266,8 +266,10 @@ const loadDataFromRedis = async (depth, forecast, device, callback) => {
     if (dv == 'infoclimat1') {
       datasets.push({
         label: 'Pluie: ' + (deviceMeta.label || dv),
-        fill: false,
-        borderColor: '#4BC0C0',
+        fill: true,
+        backgroundColor: 'rgba(135, 206, 250, 0.7)',  // Light blue with transparency
+        borderColor: 'rgba(100, 149, 237, 1)',        // Cornflower blue border
+        borderWidth: 1,
         data: alignedData.map(o => o.rain !== null && o.rain !== undefined ? parseFloat(o.rain) : null),
         yAxisID: 'right-y-axis',
         type: "bar"
