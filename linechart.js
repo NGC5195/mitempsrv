@@ -51,8 +51,8 @@ const fetchSunData = async (dateStr) => {
         const data = await response.json()
         
         if (data.status === 'OK') {
-            const sunriseUTC = parseTimeToHours(data.results.sunrise)
-            const sunsetUTC = parseTimeToHours(data.results.sunset)
+            const sunriseUTC = parseTimeToHours(data.results.nautical_twilight_begin)
+            const sunsetUTC = parseTimeToHours(data.results.nautical_twilight_end)
             
             const sunData = {
                 sunrise: Math.round(utcToCET(sunriseUTC, dateStr)), // Round to nearest hour
