@@ -329,7 +329,8 @@ const myChart = new Chart(ctx, {
                     drawTicks: true,
                 },
                 ticks: {
-                    maxTicksLimit: 12,
+                    maxTicksLimit: 24,
+                    autoSkip: false,
                     callback: (value, index, values) => {
                         // For yearly view (labels are already in DD-MMM format)
                         if (currentDepth >= 8760) {
@@ -340,8 +341,11 @@ const myChart = new Chart(ctx, {
                         const date = formatDateTime(value)
                         if (!date.hour) return value // Fallback if format doesn't match
                         
-                        // Show date "DD MMM" only at midnight (00h)
-                        if (date.hour == '00h') {
+                        // Parse hour as number (handles "00h", "0h", "00", etc.)
+                        const hour = parseInt(date.hour)
+                        
+                        // Show date "DD MMM" only at midnight (hour 0)
+                        if (hour === 0) {
                             return date.day + ' ' + monthLabel[parseInt(date.month) - 1]
                         }
                         
@@ -353,8 +357,7 @@ const myChart = new Chart(ctx, {
                         // For longer periods, show fewer labels
                         if (currentDepth <= 72) {
                             // Show hours at 6h, 12h, 18h
-                            const h = parseInt(date.hour)
-                            return (h % 6 === 0) ? date.hour : null
+                            return (hour % 6 === 0) ? date.hour : null
                         }
                         
                         // For week/month, only show dates at midnight
