@@ -4,7 +4,97 @@ const monthLabel = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'S
 // Track current depth for x-axis formatting
 let currentDepth = 24
 
-// Plugin to draw gray background for nighttime hours (21h-06h)
+// Sunrise/Sunset cache and configuration
+const LOCATION = { lat: 48.9897, lng: 0.7808 } // Your location
+const sunDataCache = new Map() // Cache: "YYYY-MM-DD" -> { sunrise: hour, sunset: hour }
+
+// Parse time string "7:31:49 AM" to decimal hours
+const parseTimeToHours = (timeStr) => {
+    const match = timeStr.match(/^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)$/i)
+    if (!match) return null
+    let [, hours, minutes, seconds, period] = match
+    hours = parseInt(hours)
+    if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12
+    if (period.toUpperCase() === 'AM' && hours === 12) hours = 0
+    return hours + parseInt(minutes) / 60 + parseInt(seconds) / 3600
+}
+
+// Convert UTC hours to CET/CEST (handles daylight saving time)
+const utcToCET = (utcHours, date) => {
+    // Create a date object to check if DST is in effect
+    const d = new Date(date)
+    d.setUTCHours(Math.floor(utcHours))
+    
+    // CET is UTC+1, CEST (summer) is UTC+2
+    // Check if date is in DST (last Sunday of March to last Sunday of October)
+    const month = d.getMonth()
+    const isDST = month > 2 && month < 9 // April to September is definitely DST
+        || (month === 2 && d.getDate() >= 25 && d.getDay() === 0) // End of March
+        || (month === 9 && d.getDate() < 25) // Beginning of October
+    
+    const offset = isDST ? 2 : 1
+    let cetHours = utcHours + offset
+    if (cetHours >= 24) cetHours -= 24
+    return cetHours
+}
+
+// Fetch sunrise/sunset for a specific date
+const fetchSunData = async (dateStr) => {
+    // dateStr format: "YYYY-MM-DD"
+    if (sunDataCache.has(dateStr)) {
+        return sunDataCache.get(dateStr)
+    }
+    
+    try {
+        const url = `https://api.sunrise-sunset.org/json?lat=${LOCATION.lat}&lng=${LOCATION.lng}&date=${dateStr}`
+        const response = await fetch(url)
+        const data = await response.json()
+        
+        if (data.status === 'OK') {
+            const sunriseUTC = parseTimeToHours(data.results.sunrise)
+            const sunsetUTC = parseTimeToHours(data.results.sunset)
+            
+            const sunData = {
+                sunrise: Math.round(utcToCET(sunriseUTC, dateStr)), // Round to nearest hour
+                sunset: Math.round(utcToCET(sunsetUTC, dateStr))
+            }
+            
+            sunDataCache.set(dateStr, sunData)
+            console.log(`[Sun] ${dateStr}: sunrise=${sunData.sunrise}h, sunset=${sunData.sunset}h (CET)`)
+            return sunData
+        }
+    } catch (e) {
+        console.log(`[Sun] Error fetching sun data for ${dateStr}:`, e)
+    }
+    
+    // Fallback to default values
+    return { sunrise: 7, sunset: 18 }
+}
+
+// Pre-fetch sun data for dates in chart labels
+const prefetchSunData = async (labels) => {
+    const dates = new Set()
+    labels.forEach(label => {
+        // Extract date from label "DD/MM/YYYY HHh"
+        const match = label.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+        if (match) {
+            const [, day, month, year] = match
+            dates.add(`${year}-${month}-${day}`)
+        }
+    })
+    
+    // Fetch all unique dates (limit to avoid too many API calls)
+    const dateArray = Array.from(dates).slice(0, 30)
+    await Promise.all(dateArray.map(d => fetchSunData(d)))
+}
+
+// Check if an hour is nighttime for a given date
+const isNightTime = (hour, dateStr) => {
+    const sunData = sunDataCache.get(dateStr) || { sunrise: 7, sunset: 18 }
+    return hour < sunData.sunrise || hour >= sunData.sunset
+}
+
+// Plugin to draw gray background for nighttime hours (based on sunrise/sunset API)
 const nightTimePlugin = {
     id: 'nightTimeBackground',
     beforeDraw: function(chart) {
@@ -22,12 +112,15 @@ const nightTimePlugin = {
         let nightStart = null
         
         labels.forEach((label, index) => {
-            // Extract hour from label (format: "DD/MM/YYYY HHh")
-            const hourMatch = label.match(/(\d{2})h$/)
-            if (!hourMatch) return
+            // Extract hour and date from label (format: "DD/MM/YYYY HHh")
+            const match = label.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2})h$/)
+            if (!match) return
             
-            const hour = parseInt(hourMatch[1])
-            const isNight = hour >= 21 || hour < 6 // 21h to 06h
+            const [, day, month, year, hourStr] = match
+            const hour = parseInt(hourStr)
+            const dateStr = `${year}-${month}-${day}`
+            
+            const isNight = isNightTime(hour, dateStr)
             
             if (isNight && nightStart === null) {
                 nightStart = index
@@ -247,26 +340,25 @@ const myChart = new Chart(ctx, {
                         const date = formatDateTime(value)
                         if (!date.hour) return value // Fallback if format doesn't match
                         
-                        // For longer periods (48h+), show date format "DD-MMM"
-                        if (currentDepth >= 48) {
-                            // Show date at midnight or at regular intervals
-                            if (date.hour == '00h' || index === 0) {
-                                return date.day + '-' + monthLabel[parseInt(date.month) - 1]
-                            } else if (currentDepth >= 168) {
-                                // For week/month, only show dates (skip hours entirely)
-                                return null
-                            } else {
-                                // For 48h-72h, show some hours at noon
-                                return date.hour == '12h' ? '12h' : null
-                            }
-                        } else {
-                            // For 24h, show hours with date at midnight
-                            if (date.hour == '00h') {
-                                return date.day + ' ' + monthLabel[parseInt(date.month) - 1]
-                            } else {
-                                return date.hour
-                            }
+                        // Show date "DD MMM" only at midnight (00h)
+                        if (date.hour == '00h') {
+                            return date.day + ' ' + monthLabel[parseInt(date.month) - 1]
                         }
+                        
+                        // For shorter periods (24h), show hours
+                        if (currentDepth <= 24) {
+                            return date.hour
+                        }
+                        
+                        // For longer periods, show fewer labels
+                        if (currentDepth <= 72) {
+                            // Show hours at 6h, 12h, 18h
+                            const h = parseInt(date.hour)
+                            return (h % 6 === 0) ? date.hour : null
+                        }
+                        
+                        // For week/month, only show dates at midnight
+                        return null
                     }
                 }            
             }]
@@ -402,9 +494,15 @@ const loadData = (depth, forecast, device) => {
     Spinner.show()
     
     xhr.open("GET", `./data?depth=${depth}&forecast=${forecast}&device=${device}`)
-    xhr.onreadystatechange = () => { 
+    xhr.onreadystatechange = async () => { 
         if (xhr.readyState === 4 && xhr.status === 200) {
             const jsondata = JSON.parse(xhr.responseText)
+            
+            // Prefetch sunrise/sunset data for chart labels (for night shading)
+            if (jsondata.chartdata && jsondata.chartdata.labels) {
+                await prefetchSunData(jsondata.chartdata.labels)
+            }
+            
             myChart.data = jsondata.chartdata
             myChart.update()
             myTable.setData(jsondata.summary)
@@ -452,6 +550,11 @@ refreshDevices('devices', ()=> {
 
 // Initialize year selector
 initYearSelector()
+
+// Pre-fetch today's sunrise/sunset data
+const today = new Date()
+const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+fetchSunData(todayStr)
 
 document.getElementById('period-select').value = depth
 document.getElementById('forecast-select').value = forecast
